@@ -98,6 +98,8 @@ Terceiro, a validacao visual pelo navegador integrado nao ficou disponivel nesta
 
 Quarto, a aplicacao ainda nao processa o conteudo real dos PDFs. Ela armazena os arquivos na sessao e simula respostas. Isso e suficiente para validar o fluxo de interface, mas nao para responder perguntas reais sobre os artigos.
 
+Quinto, foi identificado um problema nos campos de texto das funcoes de estudo: o input de "Topico para resumir" nao permitia digitacao corretamente. A causa provavel era o uso de HTML customizado envolvendo widgets nativos do Streamlit. A correcao substituiu esses wrappers por `st.container(border=True)`, mantendo o visual de painel sem bloquear a interacao.
+
 Se o projeto fosse refeito, uma melhoria seria criar desde o inicio uma estrutura de pastas separada, por exemplo:
 
 ```text
@@ -198,6 +200,7 @@ Tambem houve ajustes tecnicos durante a execucao:
 - o endpoint foi verificado por resposta HTTP 200;
 - o README foi criado depois da revisao dos criterios da rubrica.
 - a simulacao visual de pipeline foi adicionada para evidenciar a preparacao futura para IA sem criar dependencias externas.
+- um bug de interacao nos campos das funcoes de estudo foi corrigido depois de teste manual da interface.
 
 Essa sequencia demonstra uso extensivo do agente, com varias iteracoes, prompts documentados e codigo gerado a partir de supervisao humana.
 
