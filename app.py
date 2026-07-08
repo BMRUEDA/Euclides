@@ -425,66 +425,75 @@ def render_tools() -> None:
     tab_summary, tab_map, tab_table = st.tabs(["Resumo", "Mapa mental", "Tabela de dados"])
 
     with tab_summary:
-        st.markdown('<div class="tool-panel">', unsafe_allow_html=True)
-        topic = st.text_input("Topico para resumir", placeholder="Ex.: metodologia, resultados, conclusao")
-        if st.button("Gerar resumo", use_container_width=True):
-            if not st.session_state.sources:
-                st.warning("Carregue pelo menos um PDF antes de gerar um resumo.")
-            elif not topic.strip():
-                st.warning("Informe um topico para orientar o resumo.")
-            else:
-                st.markdown(
-                    f"""
-                    <div class="placeholder-output">
-                        Resumo pendente para o topico <strong>{topic}</strong>.
-                        A interface esta pronta para enviar este pedido a uma LLM usando as fontes: {source_names()}.
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-        st.markdown("</div>", unsafe_allow_html=True)
+        with st.container(border=True):
+            topic = st.text_input(
+                "Topico para resumir",
+                placeholder="Ex.: metodologia, resultados, conclusao",
+                key="summary_topic",
+            )
+            if st.button("Gerar resumo", use_container_width=True):
+                if not st.session_state.sources:
+                    st.warning("Carregue pelo menos um PDF antes de gerar um resumo.")
+                elif not topic.strip():
+                    st.warning("Informe um topico para orientar o resumo.")
+                else:
+                    st.markdown(
+                        f"""
+                        <div class="placeholder-output">
+                            Resumo pendente para o topico <strong>{topic}</strong>.
+                            A interface esta pronta para enviar este pedido a uma LLM usando as fontes: {source_names()}.
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
 
     with tab_map:
-        st.markdown('<div class="tool-panel">', unsafe_allow_html=True)
-        map_topic = st.text_input("Tema do mapa mental", placeholder="Ex.: conceitos principais do artigo")
-        if st.button("Gerar mapa mental", use_container_width=True):
-            if not st.session_state.sources:
-                st.warning("Carregue pelo menos um PDF antes de gerar um mapa mental.")
-            elif not map_topic.strip():
-                st.warning("Informe um tema para o mapa mental.")
-            else:
-                st.markdown(
-                    f"""
-                    <div class="placeholder-output">
-                        Diagrama pendente para <strong>{map_topic}</strong>.<br>
-                        Estrutura sugerida: tema central, conceitos, evidencias, autores e conclusoes.
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-        st.markdown("</div>", unsafe_allow_html=True)
+        with st.container(border=True):
+            map_topic = st.text_input(
+                "Tema do mapa mental",
+                placeholder="Ex.: conceitos principais do artigo",
+                key="mind_map_topic",
+            )
+            if st.button("Gerar mapa mental", use_container_width=True):
+                if not st.session_state.sources:
+                    st.warning("Carregue pelo menos um PDF antes de gerar um mapa mental.")
+                elif not map_topic.strip():
+                    st.warning("Informe um tema para o mapa mental.")
+                else:
+                    st.markdown(
+                        f"""
+                        <div class="placeholder-output">
+                            Diagrama pendente para <strong>{map_topic}</strong>.<br>
+                            Estrutura sugerida: tema central, conceitos, evidencias, autores e conclusoes.
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
 
     with tab_table:
-        st.markdown('<div class="tool-panel">', unsafe_allow_html=True)
-        table_topic = st.text_input("Dados que deseja extrair", placeholder="Ex.: amostra, metodo, variaveis, resultados")
-        if st.button("Gerar tabela", use_container_width=True):
-            if not st.session_state.sources:
-                st.warning("Carregue pelo menos um PDF antes de gerar uma tabela.")
-            elif not table_topic.strip():
-                st.warning("Informe quais dados devem entrar na tabela.")
-            else:
-                st.dataframe(
-                    [
-                        {
-                            "Documento": "Fonte PDF",
-                            "Campo": table_topic,
-                            "Valor": "Pendente de extracao pela LLM",
-                        }
-                    ],
-                    use_container_width=True,
-                    hide_index=True,
-                )
-        st.markdown("</div>", unsafe_allow_html=True)
+        with st.container(border=True):
+            table_topic = st.text_input(
+                "Dados que deseja extrair",
+                placeholder="Ex.: amostra, metodo, variaveis, resultados",
+                key="table_topic",
+            )
+            if st.button("Gerar tabela", use_container_width=True):
+                if not st.session_state.sources:
+                    st.warning("Carregue pelo menos um PDF antes de gerar uma tabela.")
+                elif not table_topic.strip():
+                    st.warning("Informe quais dados devem entrar na tabela.")
+                else:
+                    st.dataframe(
+                        [
+                            {
+                                "Documento": "Fonte PDF",
+                                "Campo": table_topic,
+                                "Valor": "Pendente de extracao pela LLM",
+                            }
+                        ],
+                        use_container_width=True,
+                        hide_index=True,
+                    )
 
 
 def main() -> None:
