@@ -2,6 +2,16 @@
 
 Euclides e uma aplicacao web em Streamlit para estudo de artigos em PDF. A proposta e oferecer uma experiencia parecida com um notebook de pesquisa: o usuario adiciona fontes, visualiza os documentos carregados e usa uma area de chat e ferramentas de estudo para explorar o conteudo.
 
+## Endpoint publicado
+
+A aplicacao esta publicada no Streamlit Cloud:
+
+```text
+https://euclides.streamlit.app/
+```
+
+Esse endpoint e a versao publica usada para avaliacao. A versao local pode ser executada com o comando abaixo.
+
 ## Como executar
 
 ```powershell
