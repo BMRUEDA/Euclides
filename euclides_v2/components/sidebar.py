@@ -6,6 +6,12 @@ from models.source import SourceFile
 
 
 MAX_SOURCES = 3
+DEFAULT_SYSTEM_PROMPT = """Voce e o Euclides, um assistente de estudo academico.
+Use apenas as fontes em PDF carregadas pelo usuario.
+Explique com clareza, cite o documento quando possivel e avise quando algo nao estiver nas fontes.
+Modo de ensino: [[TEACHING_MODE]]
+Fontes carregadas: [[SOURCES]]
+"""
 
 
 def format_size(size: int) -> str:
@@ -14,6 +20,20 @@ def format_size(size: int) -> str:
     if size < 1024 * 1024:
         return f"{size / 1024:.1f} KB"
     return f"{size / (1024 * 1024):.1f} MB"
+
+
+def source_names() -> str:
+    if not st.session_state.sources:
+        return "Nenhum PDF carregado ainda."
+    return ", ".join(source.name for source in st.session_state.sources)
+
+
+def final_system_prompt() -> str:
+    return (
+        st.session_state.base_system_prompt
+        .replace("[[TEACHING_MODE]]", st.session_state.teaching_mode)
+        .replace("[[SOURCES]]", source_names())
+    )
 
 
 def render_sidebar() -> None:
@@ -57,3 +77,81 @@ def render_sidebar() -> None:
                 ]
                 st.rerun()
 
+        st.caption(f"{len(st.session_state.sources)} de {MAX_SOURCES} fontes adicionadas.")
+
+
+def render_configuration_sidebar() -> None:
+    with st.sidebar:
+        st.divider()
+        st.header("Configuracao futura")
+        st.caption("Preparada para conectar modelos, RAG e ferramentas reais.")
+
+        with st.expander("Model settings", expanded=False):
+            st.selectbox(
+                "Provedor",
+                ["Placeholder", "OpenAI", "Anthropic", "Google", "Ollama", "Azure OpenAI"],
+                key="model_provider",
+            )
+            st.text_input("Modelo", key="model_name")
+            st.slider("Temperatura", 0.0, 1.5, key="temperature", step=0.1)
+            st.number_input(
+                "Max tokens",
+                min_value=256,
+                max_value=16000,
+                step=256,
+                key="max_tokens",
+            )
+
+        with st.expander("Model config", expanded=False):
+            st.number_input(
+                "Trechos recuperados por pergunta",
+                min_value=1,
+                max_value=20,
+                key="retrieval_k",
+            )
+            st.checkbox("Mostrar etapas quando disponivel", key="show_reasoning")
+            st.selectbox(
+                "Formato de citacao",
+                ["Nome do arquivo", "Arquivo + pagina", "ABNT simplificado"],
+                key="citation_style",
+            )
+            st.selectbox(
+                "Estrategia de resposta",
+                [
+                    "Responder somente com as fontes",
+                    "Permitir conhecimento geral marcado",
+                    "Perguntar quando faltar contexto",
+                ],
+                key="answer_strategy",
+            )
+
+        with st.expander("Teaching mode", expanded=False):
+            st.radio(
+                "Modo",
+                [
+                    "Tutor socratico",
+                    "Explicacao direta",
+                    "Preparacao para prova",
+                    "Revisao critica",
+                    "Passo a passo",
+                ],
+                key="teaching_mode",
+            )
+
+        with st.expander("Active tools", expanded=False):
+            st.multiselect(
+                "Ferramentas disponiveis",
+                ["Chat", "Resumo", "Mapa mental", "Tabela de dados", "Citas", "Flashcards", "Quiz"],
+                key="active_tools",
+            )
+            if st.session_state.active_tools:
+                st.write(", ".join(st.session_state.active_tools))
+
+        with st.expander("Final system prompt preview", expanded=False):
+            st.text_area(
+                "Prompt base",
+                key="base_system_prompt",
+                height=180,
+                help="Use placeholders como [[TEACHING_MODE]] e [[SOURCES]].",
+            )
+            st.code(final_system_prompt(), language="text")
