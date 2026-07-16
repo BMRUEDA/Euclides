@@ -541,26 +541,30 @@ O usuario podera carregar PDFs, perguntar no chat ou usar uma ferramenta, e rece
 
 ## Fase 6 - RAG vetorial
 
-Status: planejada.
+Status: prototipo inicial implementado.
 
 Objetivo: substituir ou complementar a busca lexical por recuperacao semantica.
 
-Passos sugeridos:
+O que foi implementado nesta primeira versao:
 
-1. Dividir textos em chunks menores e controlados.
-2. Gerar embeddings.
-3. Salvar vetores em uma base local ou em memoria.
-4. Buscar por similaridade semantica.
-5. Comparar resultado vetorial com a busca simples atual.
+1. Reaproveitamento do chunking ja existente.
+2. Criacao de `embedding_service.py` para gerar embeddings via Gemini.
+3. Criacao de `vector_retrieval.py` para busca vetorial e busca hibrida.
+4. Similaridade por cosseno em memoria, sem FAISS ou Chroma.
+5. Modo de busca selecionavel na sidebar:
+   - `Lexical`;
+   - `Vetorial`;
+   - `Hibrida`.
+6. Fallback automatico para busca lexical quando embeddings falham ou `GEMINI_API_KEY` nao esta configurada.
 
 O que esta fase deve entregar:
 
-- dividir paginas longas em chunks menores;
-- gerar embeddings dos chunks;
-- armazenar embeddings em um indice vetorial;
-- buscar trechos por similaridade semantica;
-- melhorar perguntas em portugues sobre artigos em ingles;
-- combinar busca semantica com busca lexical quando for util.
+- dividir paginas longas em chunks menores: implementado;
+- gerar embeddings dos chunks: implementado via Gemini quando ativado;
+- armazenar embeddings em um indice vetorial: implementado em memoria/cache do Streamlit para prototipo;
+- buscar trechos por similaridade semantica: implementado;
+- melhorar perguntas em portugues sobre artigos em ingles: em validacao;
+- combinar busca semantica com busca lexical quando for util: implementado no modo `Hibrida`.
 
 Por que essa fase e importante:
 
@@ -577,16 +581,12 @@ Uma busca lexical pode nao encontrar bem essa relacao se os termos nao estiverem
 
 Como sera feita:
 
-1. Reaproveitar ou ajustar o servico `chunking.py`.
-2. Gerar embeddings dos chunks.
-3. Criar um servico de embeddings, por exemplo `embedding_service.py`.
-4. Escolher um modelo de embeddings:
-   - local, se a prioridade for estudo/offline;
-   - via API, se a prioridade for qualidade e simplicidade.
-5. Criar um indice vetorial local:
-   - em memoria para prototipo;
-   - FAISS, Chroma ou alternativa similar em fase mais madura.
-6. Implementar `semantic_retrieve`.
+1. Reaproveitar ou ajustar o servico `chunking.py`: implementado.
+2. Gerar embeddings dos chunks: implementado com `gemini-embedding-001`.
+3. Criar um servico de embeddings: implementado em `embedding_service.py`.
+4. Escolher um modelo de embeddings: Gemini via API, porque a maquina tem pouca RAM.
+5. Criar um indice vetorial local: prototipo em memoria/cache do Streamlit.
+6. Implementar `semantic_retrieve`: implementado em `vector_retrieval.py`.
 7. Combinar resultados:
    - busca semantica principal;
    - busca lexical como fallback;
@@ -610,7 +610,8 @@ Estrategia recomendada:
 
 ```text
 consulta do usuario
-  -> busca semantica multilingue como principal
+  -> modo selecionado na sidebar
+  -> busca semantica se modo Vetorial/Hibrida e GEMINI_API_KEY existir
   -> busca lexical como fallback/complemento
   -> remover duplicados
   -> ordenar melhores trechos
@@ -626,6 +627,12 @@ Motivo:
 Resultado esperado da Fase 6:
 
 O usuario podera fazer perguntas naturais em portugues mesmo quando o artigo estiver em ingles, e o sistema devera recuperar trechos relevantes por significado, nao apenas por palavras iguais.
+
+Observacao de custo:
+
+- o modo padrao continua `Lexical`, sem chamadas de embeddings;
+- `Vetorial` e `Hibrida` podem chamar a API de embeddings do Gemini;
+- os embeddings sao cacheados pelo Streamlit para reduzir chamadas repetidas no mesmo conjunto de textos.
 
 ## Como executar
 

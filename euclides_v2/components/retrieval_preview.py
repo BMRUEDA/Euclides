@@ -3,7 +3,7 @@ from __future__ import annotations
 import streamlit as st
 
 from services.pdf_loader import load_pdf_corpus
-from services.retrieval import retrieve_ranked_chunks
+from services.vector_retrieval import retrieve_chunks
 
 
 def render_retrieval_preview() -> None:
@@ -11,8 +11,7 @@ def render_retrieval_preview() -> None:
 
     with st.expander("Buscar trechos nos PDFs", expanded=False):
         st.caption(
-            "A busca aceita termos em portugues e expande alguns termos academicos comuns "
-            "para equivalentes em ingles."
+            "A busca pode usar modo lexical, vetorial ou hibrido, conforme a configuracao da sidebar."
         )
         query = st.text_input(
             "Consulta de teste",
@@ -36,10 +35,11 @@ def render_retrieval_preview() -> None:
             st.warning("Nao ha texto extraivel para buscar.")
             return
 
-        results = retrieve_ranked_chunks(
+        results = retrieve_chunks(
             query=query,
             chunks=corpus.chunks,
             limit=st.session_state.retrieval_k,
+            mode=st.session_state.retrieval_mode,
         )
 
         if not results:

@@ -117,6 +117,11 @@ def render_configuration_sidebar() -> None:
             )
 
         with st.expander("Model config", expanded=False):
+            st.selectbox(
+                "Modo de busca",
+                ["Lexical", "Vetorial", "Hibrida"],
+                key="retrieval_mode",
+            )
             st.number_input(
                 "Trechos recuperados por pergunta",
                 min_value=1,

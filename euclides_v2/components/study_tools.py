@@ -6,7 +6,6 @@ from models.source import RetrievedChunk
 from components.sidebar import current_llm_settings, final_system_prompt
 from services.llm_service import generate_response
 from services.pdf_loader import load_pdf_corpus
-from services.retrieval import retrieve_ranked_chunks
 from services.tool_service import (
     build_data_table,
     build_mind_map,
@@ -15,6 +14,7 @@ from services.tool_service import (
     build_summary_prompt,
     build_table_prompt,
 )
+from services.vector_retrieval import retrieve_chunks
 
 
 def should_use_real_model() -> bool:
@@ -38,10 +38,11 @@ def get_relevant_results_or_warn(topic: str) -> list[RetrievedChunk] | None:
         )
         return None
 
-    results = retrieve_ranked_chunks(
+    results = retrieve_chunks(
         query=topic,
         chunks=corpus.chunks,
         limit=st.session_state.retrieval_k,
+        mode=st.session_state.retrieval_mode,
     )
     if not results:
         st.warning("Nenhum trecho relevante foi encontrado para esse topico.")

@@ -25,6 +25,7 @@ def init_state() -> None:
     st.session_state.setdefault("temperature", 0.2)
     st.session_state.setdefault("max_tokens", 1200)
     st.session_state.setdefault("retrieval_k", 5)
+    st.session_state.setdefault("retrieval_mode", "Lexical")
     st.session_state.setdefault("teaching_mode", "Tutor socratico")
     st.session_state.setdefault("show_reasoning", False)
     st.session_state.setdefault("citation_style", "Arquivo + pagina")
