@@ -436,15 +436,15 @@ Como testar:
 
 ## Fase 5 - Modelo real
 
-Status: em implementacao, com adaptador Gemini inicial.
+Status: minimo funcional implementado com Gemini.
 
 Objetivo: conectar um provedor de LLM.
 
 Provedores planejados:
 
-- Ollama para modelos locais;
-- OpenAI para modelos via API;
-- Gemini para alternativa via Google.
+- Gemini como provedor real inicial via API;
+- OpenAI como proximo provedor via API, ainda nao implementado;
+- Ollama adiado para esta maquina por limitacao de RAM.
 
 O design atual ja deixa a selecao visual na sidebar com `Placeholder`, `Ollama`, `OpenAI` e `Gemini`. O primeiro provedor real conectado e o Gemini.
 
@@ -465,6 +465,13 @@ Adaptador Gemini inicial:
 - usa `temperature` e `max tokens` da sidebar;
 - mostra erro amigavel quando a chave esta ausente, o modelo nao existe, a conexao falha ou o limite gratuito e atingido;
 - mantem `Placeholder` como modo simulado para testar a aplicacao sem API.
+
+Refinamento de respostas:
+
+- o chat pede resposta direta seguida de evidencias;
+- cada afirmacao baseada nos documentos deve citar arquivo e pagina;
+- quando o contexto nao tiver a informacao, a resposta deve dizer que ela nao foi encontrada nos PDFs carregados;
+- resumo, mapa mental e tabela usam prompts especificos, mas seguem a mesma regra de citacao e contexto obrigatorio.
 
 O que esta fase deve entregar:
 
@@ -491,11 +498,11 @@ chat.py / study_tools.py
 
 Como sera feita:
 
-1. Criar uma interface comum em `llm_service.py`, por exemplo `generate_response(prompt, settings)`.
+1. Criar uma interface comum em `llm_service.py`, por exemplo `generate_response(prompt, settings)`. Implementado.
 2. Criar adaptadores internos para cada provedor:
-   - `call_ollama`;
-   - `call_openai`;
-   - `call_gemini`.
+   - `call_gemini`: implementado;
+   - `call_openai`: planejado;
+   - `call_ollama`: adiado por limitacao de RAM nesta maquina.
 3. Ler da sidebar:
    - provedor;
    - nome do modelo;
@@ -513,8 +520,10 @@ Como sera feita:
 
 Estrategia recomendada:
 
-- Comecar por Ollama se o objetivo for estudar localmente sem custo de API.
-- Depois adicionar OpenAI ou Gemini usando variaveis de ambiente.
+- Usar Gemini como provedor inicial, porque funciona nesta maquina com pouca RAM.
+- Manter `Placeholder` como modo sem custo para testes de interface e recuperacao.
+- Adicionar OpenAI futuramente se for necessario comparar qualidade ou custo.
+- Adiar Ollama local enquanto a maquina tiver cerca de 4 GB de RAM.
 - Nao colocar chaves de API no codigo.
 - Manter a resposta sempre baseada nos trechos recuperados, nao em conhecimento solto do modelo.
 

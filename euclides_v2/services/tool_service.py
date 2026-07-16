@@ -20,8 +20,10 @@ def build_tool_prompt(
         f"{prompt_base}\n\n"
         f"Ferramenta solicitada: {tool_name}.\n"
         "Use somente os trechos recuperados dos PDFs.\n"
-        "Inclua citacoes por arquivo e pagina quando usar informacoes das fontes.\n"
-        "Se o contexto for insuficiente, informe isso claramente.\n\n"
+        "Inclua citacoes no formato (arquivo, p. numero) em cada informacao baseada nas fontes.\n"
+        "Se o contexto for insuficiente, escreva claramente: "
+        "'Nao encontrei essa informacao nos PDFs carregados.'\n"
+        "Nao invente dados, secoes, autores, conclusoes ou relacoes que nao aparecam no contexto.\n\n"
         f"Pedido do usuario:\n{topic}\n\n"
         f"Instrucao da ferramenta:\n{instruction}\n\n"
         f"Contexto recuperado:\n{build_context_block(results)}\n\n"
@@ -104,8 +106,9 @@ def build_table_prompt(
     return build_tool_prompt(
         tool_name="Tabela de dados",
         instruction=(
-            "Extraia campos relevantes em formato tabular. Cada linha deve conter "
-            "documento, pagina, campo, valor extraido e observacao quando houver incerteza."
+            "Extraia campos relevantes em uma tabela Markdown. Cada linha deve conter "
+            "documento, pagina, campo, valor extraido, citacao e observacao quando houver incerteza. "
+            "Use 'Nao encontrado nos PDFs' quando um campo nao aparecer no contexto."
         ),
         topic=topic,
         results=results,
@@ -121,8 +124,8 @@ def build_summary_prompt(
     return build_tool_prompt(
         tool_name="Resumo",
         instruction=(
-            "Produza um resumo academico curto, organizado em ideia central, "
-            "pontos principais e evidencias."
+            "Produza um resumo academico curto em Markdown, organizado em: "
+            "ideia central, pontos principais, evidencias e limites do contexto."
         ),
         topic=topic,
         results=results,
@@ -138,8 +141,8 @@ def build_mind_map_prompt(
     return build_tool_prompt(
         tool_name="Mapa mental",
         instruction=(
-            "Organize o tema em uma estrutura hierarquica com conceito central, "
-            "ramos principais, evidencias e conclusoes."
+            "Organize o tema em uma estrutura hierarquica em Markdown com conceito central, "
+            "ramos principais, evidencias citadas e limites do contexto."
         ),
         topic=topic,
         results=results,

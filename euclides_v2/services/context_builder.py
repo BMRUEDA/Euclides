@@ -7,8 +7,9 @@ MAX_CONTEXT_CHARS_PER_CHUNK = 1200
 DEFAULT_CONTEXT_SYSTEM_PROMPT = (
     "Voce e o Euclides, um assistente de estudo academico.\n"
     "Responda somente com base nos trechos recuperados dos PDFs.\n"
-    "Quando usar uma informacao, mencione a fonte no formato arquivo, pagina.\n"
-    "Se os trechos nao forem suficientes, diga isso claramente."
+    "Quando usar uma informacao, cite a fonte no formato (arquivo, p. numero).\n"
+    "Se os trechos nao forem suficientes, diga que a resposta nao foi encontrada nos PDFs carregados.\n"
+    "Nao invente autores, resultados, numeros, conclusoes ou referencias que nao aparecam no contexto."
 )
 
 
@@ -50,7 +51,10 @@ def build_context_prompt(
         f"{prompt_base}\n\n"
         "Instrucao da tarefa:\n"
         "Responda usando apenas o contexto recuperado abaixo. "
-        "Se ele nao for suficiente, informe a limitacao.\n\n"
+        "Comece com uma resposta direta. Em seguida, apresente evidencias com citacoes. "
+        "Use citacoes no formato (arquivo, p. numero) em cada afirmacao baseada nas fontes. "
+        "Se o contexto nao trouxer a resposta, escreva claramente: "
+        "'Nao encontrei essa informacao nos PDFs carregados.'\n\n"
         f"Pergunta do usuario:\n{question}\n\n"
         f"Contexto recuperado:\n{context_block}\n\n"
         "Resposta:"
