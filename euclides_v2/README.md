@@ -459,6 +459,7 @@ Preparacao ja feita:
 Adaptador Gemini inicial:
 
 - modelo padrao: `gemini-3.1-flash-lite`;
+- provedor padrao do app: `Placeholder`, para evitar chamadas de API por acidente;
 - chave esperada: `GEMINI_API_KEY`;
 - chamada feita via REST para a API `generateContent`;
 - usa `temperature` e `max tokens` da sidebar;
