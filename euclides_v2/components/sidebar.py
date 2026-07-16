@@ -121,7 +121,17 @@ def render_configuration_sidebar() -> None:
                 "Modo de busca",
                 ["Lexical", "Vetorial", "Hibrida"],
                 key="retrieval_mode",
+                help=(
+                    "Lexical nao usa API. Vetorial usa embeddings Gemini quando ha chave. "
+                    "Hibrida combina embeddings com busca lexical."
+                ),
             )
+            if st.session_state.retrieval_mode == "Lexical":
+                st.caption("Busca local sem custo de API.")
+            elif st.session_state.retrieval_mode == "Vetorial":
+                st.caption("Usa embeddings Gemini quando GEMINI_API_KEY esta configurada.")
+            else:
+                st.caption("Recomendado para qualidade: embeddings Gemini + busca lexical.")
             st.number_input(
                 "Trechos recuperados por pergunta",
                 min_value=1,

@@ -557,6 +557,12 @@ O que foi implementado nesta primeira versao:
    - `Hibrida`.
 6. Fallback automatico para busca lexical quando embeddings falham ou `GEMINI_API_KEY` nao esta configurada.
 
+Uso recomendado:
+
+- `Lexical`: melhor escolha quando o objetivo e custo zero, velocidade e termos exatos;
+- `Vetorial`: util para comparar a recuperacao semantica isolada;
+- `Hibrida`: melhor escolha quando o usuario aceita usar embeddings, pois combina significado com termos exatos pelo mesmo custo aproximado do modo vetorial.
+
 O que esta fase deve entregar:
 
 - dividir paginas longas em chunks menores: implementado;
@@ -632,6 +638,7 @@ Observacao de custo:
 
 - o modo padrao continua `Lexical`, sem chamadas de embeddings;
 - `Vetorial` e `Hibrida` podem chamar a API de embeddings do Gemini;
+- no prototipo atual, `Vetorial` e `Hibrida` tem custo aproximado parecido, porque ambos geram embeddings da consulta e dos chunks;
 - os embeddings sao cacheados pelo Streamlit para reduzir chamadas repetidas no mesmo conjunto de textos.
 
 ## Como executar
