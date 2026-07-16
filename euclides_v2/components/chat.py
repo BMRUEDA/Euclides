@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-from components.sidebar import final_system_prompt
+from components.sidebar import current_llm_settings, final_system_prompt
 from services.llm_service import answer_with_context
 from services.pdf_loader import load_pdf_corpus
 from services.retrieval import retrieve_ranked_chunks
@@ -48,6 +48,7 @@ def render_chat() -> None:
         question=prompt,
         retrieved_chunks=relevant_chunks,
         system_prompt=final_system_prompt(),
+        settings=current_llm_settings(),
     )
 
     st.session_state.messages.append({"role": "assistant", "content": answer})

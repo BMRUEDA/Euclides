@@ -3,7 +3,8 @@ from __future__ import annotations
 import streamlit as st
 
 from models.source import RetrievedChunk
-from components.sidebar import final_system_prompt
+from components.sidebar import current_llm_settings, final_system_prompt
+from services.llm_service import generate_response
 from services.pdf_loader import load_pdf_corpus
 from services.retrieval import retrieve_ranked_chunks
 from services.tool_service import (
@@ -14,6 +15,10 @@ from services.tool_service import (
     build_summary_prompt,
     build_table_prompt,
 )
+
+
+def should_use_real_model() -> bool:
+    return st.session_state.model_provider != "Placeholder"
 
 
 def get_relevant_results_or_warn(topic: str) -> list[RetrievedChunk] | None:
@@ -55,34 +60,37 @@ def render_study_tools() -> None:
         if st.button("Gerar resumo", use_container_width=True):
             results = get_relevant_results_or_warn(topic)
             if results:
-                st.markdown(build_summary(topic, results))
+                prompt = build_summary_prompt(topic, results, final_system_prompt())
+                if should_use_real_model():
+                    st.markdown(generate_response(prompt, current_llm_settings()))
+                else:
+                    st.markdown(build_summary(topic, results))
                 with st.expander("Prompt preparado para a LLM", expanded=False):
-                    st.code(
-                        build_summary_prompt(topic, results, final_system_prompt()),
-                        language="text",
-                    )
+                    st.code(prompt, language="text")
 
     with tab_map:
         topic = st.text_input("Tema do mapa mental", key="mind_map_topic_v2")
         if st.button("Gerar mapa mental", use_container_width=True):
             results = get_relevant_results_or_warn(topic)
             if results:
-                st.markdown(build_mind_map(topic, results))
+                prompt = build_mind_map_prompt(topic, results, final_system_prompt())
+                if should_use_real_model():
+                    st.markdown(generate_response(prompt, current_llm_settings()))
+                else:
+                    st.markdown(build_mind_map(topic, results))
                 with st.expander("Prompt preparado para a LLM", expanded=False):
-                    st.code(
-                        build_mind_map_prompt(topic, results, final_system_prompt()),
-                        language="text",
-                    )
+                    st.code(prompt, language="text")
 
     with tab_table:
         topic = st.text_input("Dados que deseja extrair", key="table_topic_v2")
         if st.button("Gerar tabela", use_container_width=True):
             results = get_relevant_results_or_warn(topic)
             if results:
-                rows = build_data_table(topic, results)
-                st.dataframe(rows, use_container_width=True, hide_index=True)
+                prompt = build_table_prompt(topic, results, final_system_prompt())
+                if should_use_real_model():
+                    st.markdown(generate_response(prompt, current_llm_settings()))
+                else:
+                    rows = build_data_table(topic, results)
+                    st.dataframe(rows, use_container_width=True, hide_index=True)
                 with st.expander("Prompt preparado para a LLM", expanded=False):
-                    st.code(
-                        build_table_prompt(topic, results, final_system_prompt()),
-                        language="text",
-                    )
+                    st.code(prompt, language="text")

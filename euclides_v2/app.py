@@ -14,13 +14,14 @@ from components.retrieval_preview import render_retrieval_preview
 from components.sidebar import DEFAULT_SYSTEM_PROMPT, render_configuration_sidebar, render_sidebar
 from components.source_diagnostics import render_source_diagnostics
 from components.study_tools import render_study_tools
+from services.llm_service import DEFAULT_GEMINI_MODEL
 
 
 def init_state() -> None:
     st.session_state.setdefault("sources", [])
     st.session_state.setdefault("messages", [])
-    st.session_state.setdefault("model_provider", "Placeholder")
-    st.session_state.setdefault("model_name", "Modelo ainda nao conectado")
+    st.session_state.setdefault("model_provider", "Gemini")
+    st.session_state.setdefault("model_name", DEFAULT_GEMINI_MODEL)
     st.session_state.setdefault("temperature", 0.2)
     st.session_state.setdefault("max_tokens", 1200)
     st.session_state.setdefault("retrieval_k", 5)

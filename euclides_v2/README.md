@@ -436,7 +436,7 @@ Como testar:
 
 ## Fase 5 - Modelo real
 
-Status: planejada.
+Status: em implementacao, com adaptador Gemini inicial.
 
 Objetivo: conectar um provedor de LLM.
 
@@ -446,7 +446,24 @@ Provedores planejados:
 - OpenAI para modelos via API;
 - Gemini para alternativa via Google.
 
-O design atual ja deixa a selecao visual na sidebar, mas ainda nao executa chamadas reais.
+O design atual ja deixa a selecao visual na sidebar com `Placeholder`, `Ollama`, `OpenAI` e `Gemini`. O primeiro provedor real conectado e o Gemini.
+
+Preparacao ja feita:
+
+- o chat ja monta o prompt final com o contexto recuperado;
+- as ferramentas ja montam prompts especificos com o mesmo contexto recuperado;
+- o `Final system prompt preview` da sidebar ja e aplicado ao chat e aos prompts das ferramentas;
+- `llm_service.py` concentra a resposta simulada, as configuracoes de modelo e a chamada real ao Gemini;
+- `tool_service.py` concentra os prompts das ferramentas e reutiliza o mesmo servico de modelo.
+
+Adaptador Gemini inicial:
+
+- modelo padrao: `gemini-3.1-flash-lite`;
+- chave esperada: `GEMINI_API_KEY`;
+- chamada feita via REST para a API `generateContent`;
+- usa `temperature` e `max tokens` da sidebar;
+- mostra erro amigavel quando a chave esta ausente, o modelo nao existe, a conexao falha ou o limite gratuito e atingido;
+- mantem `Placeholder` como modo simulado para testar a aplicacao sem API.
 
 O que esta fase deve entregar:
 
@@ -625,6 +642,26 @@ streamlit>=1.36.0
 pypdf>=5.0.0
 ```
 
+Nenhuma dependencia nova foi adicionada para o Gemini inicial. A chamada usa bibliotecas padrao do Python via REST.
+
+Variavel de ambiente necessaria para usar Gemini:
+
+```text
+GEMINI_API_KEY
+```
+
+Em PowerShell:
+
+```powershell
+$env:GEMINI_API_KEY="SUA_CHAVE_AQUI"
+```
+
+Dependencias futuras podem entrar junto com outros adaptadores da Fase 5, por exemplo:
+
+- Ollama: cliente HTTP, como `requests` ou `httpx`;
+- OpenAI: SDK oficial `openai` ou cliente HTTP;
+- Gemini avancado: SDK do Google, se for necessario usar recursos alem da chamada REST atual.
+
 ## Fluxo atual da aplicacao
 
 1. Usuario carrega PDFs na sidebar.
@@ -634,11 +671,11 @@ pypdf>=5.0.0
 5. O teste de busca chama `retrieve_ranked_chunks`.
 6. Chat usa os resultados ranqueados para montar contexto e resposta simulada.
 7. Ferramentas usam os resultados ranqueados para montar resumo, mapa mental, tabela e prompts simulados.
-8. A resposta final ainda e simulada.
+8. A resposta final usa Gemini quando o provedor esta selecionado e `GEMINI_API_KEY` existe; caso contrario, o modo `Placeholder` continua simulado.
 
 ## Limitacoes atuais
 
-- Ainda nao ha LLM real conectada.
+- A LLM real inicial e Gemini; Ollama e OpenAI ainda nao foram conectados.
 - Ainda nao ha embeddings.
 - Ainda nao ha banco vetorial.
 - PDFs escaneados sem OCR nao terao texto extraivel.
@@ -652,6 +689,6 @@ Para salvar as mudancas:
 
 ```powershell
 git add euclides_v2
-git commit -m "Document Euclides v2 development phases"
+git commit -m "Prepare Euclides v2 for real LLM integration"
 git push origin main
 ```

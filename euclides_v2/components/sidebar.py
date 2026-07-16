@@ -3,6 +3,7 @@ from __future__ import annotations
 import streamlit as st
 
 from models.source import SourceFile
+from services.llm_service import DEFAULT_GEMINI_MODEL, LlmSettings
 
 
 MAX_SOURCES = 3
@@ -37,6 +38,15 @@ def final_system_prompt() -> str:
         .replace("[[SOURCES]]", source_names())
         .replace("[[CITATION_STYLE]]", st.session_state.citation_style)
         .replace("[[ANSWER_STRATEGY]]", st.session_state.answer_strategy)
+    )
+
+
+def current_llm_settings() -> LlmSettings:
+    return LlmSettings(
+        provider=st.session_state.model_provider,
+        model_name=st.session_state.model_name,
+        temperature=float(st.session_state.temperature),
+        max_tokens=int(st.session_state.max_tokens),
     )
 
 
@@ -88,7 +98,7 @@ def render_configuration_sidebar() -> None:
     with st.sidebar:
         st.divider()
         st.header("Configuracao futura")
-        st.caption("Preparada para conectar modelos, RAG e ferramentas reais.")
+        st.caption("Configuracao para modelo real, RAG e ferramentas.")
 
         with st.expander("Model settings", expanded=False):
             st.selectbox(
@@ -96,7 +106,7 @@ def render_configuration_sidebar() -> None:
                 ["Placeholder", "Ollama", "OpenAI", "Gemini"],
                 key="model_provider",
             )
-            st.text_input("Modelo", key="model_name")
+            st.text_input("Modelo", key="model_name", placeholder=DEFAULT_GEMINI_MODEL)
             st.slider("Temperatura", 0.0, 1.5, key="temperature", step=0.1)
             st.number_input(
                 "Max tokens",
