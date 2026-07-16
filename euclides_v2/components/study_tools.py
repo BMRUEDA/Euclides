@@ -3,6 +3,7 @@ from __future__ import annotations
 import streamlit as st
 
 from models.source import RetrievedChunk
+from components.sidebar import final_system_prompt
 from services.pdf_loader import load_pdf_corpus
 from services.retrieval import retrieve_ranked_chunks
 from services.tool_service import (
@@ -56,7 +57,10 @@ def render_study_tools() -> None:
             if results:
                 st.markdown(build_summary(topic, results))
                 with st.expander("Prompt preparado para a LLM", expanded=False):
-                    st.code(build_summary_prompt(topic, results), language="text")
+                    st.code(
+                        build_summary_prompt(topic, results, final_system_prompt()),
+                        language="text",
+                    )
 
     with tab_map:
         topic = st.text_input("Tema do mapa mental", key="mind_map_topic_v2")
@@ -65,7 +69,10 @@ def render_study_tools() -> None:
             if results:
                 st.markdown(build_mind_map(topic, results))
                 with st.expander("Prompt preparado para a LLM", expanded=False):
-                    st.code(build_mind_map_prompt(topic, results), language="text")
+                    st.code(
+                        build_mind_map_prompt(topic, results, final_system_prompt()),
+                        language="text",
+                    )
 
     with tab_table:
         topic = st.text_input("Dados que deseja extrair", key="table_topic_v2")
@@ -75,4 +82,7 @@ def render_study_tools() -> None:
                 rows = build_data_table(topic, results)
                 st.dataframe(rows, use_container_width=True, hide_index=True)
                 with st.expander("Prompt preparado para a LLM", expanded=False):
-                    st.code(build_table_prompt(topic, results), language="text")
+                    st.code(
+                        build_table_prompt(topic, results, final_system_prompt()),
+                        language="text",
+                    )

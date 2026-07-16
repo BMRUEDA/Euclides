@@ -4,14 +4,18 @@ from models.source import RetrievedChunk
 from services.context_builder import build_context_prompt, build_sources_summary
 
 
-def answer_with_context(question: str, retrieved_chunks: list[RetrievedChunk]) -> str:
+def answer_with_context(
+    question: str,
+    retrieved_chunks: list[RetrievedChunk],
+    system_prompt: str | None = None,
+) -> str:
     if not retrieved_chunks:
         return (
             "Nao encontrei trechos relevantes nos PDFs carregados. "
             "Tente reformular a pergunta ou carregar documentos com texto extraivel."
         )
 
-    context_prompt = build_context_prompt(question, retrieved_chunks)
+    context_prompt = build_context_prompt(question, retrieved_chunks, system_prompt)
     sources = build_sources_summary(retrieved_chunks)
     best_result = retrieved_chunks[0]
     best_chunk = best_result.chunk

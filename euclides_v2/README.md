@@ -62,6 +62,7 @@ euclides_v2/
   models/
     source.py
   services/
+    chunking.py
     context_builder.py
     llm_service.py
     pdf_loader.py
@@ -185,9 +186,22 @@ Responsabilidades:
 - abrir PDFs a partir dos bytes carregados;
 - extrair texto pagina por pagina com `pypdf`;
 - limpar espacos repetidos;
-- criar `DocumentChunk` com nome do arquivo, pagina e texto;
+- criar `DocumentChunk` com nome do arquivo, pagina e trecho controlado;
 - gerar diagnostico tecnico do PDF;
+- usar cache do Streamlit para evitar reprocessar os mesmos PDFs a cada painel;
 - tratar erros de leitura sem quebrar a aplicacao.
+
+### `services/chunking.py`
+
+Servico de divisao de texto em trechos menores.
+
+Ele:
+
+- recebe o texto extraido de uma pagina;
+- limpa espacos repetidos;
+- divide textos longos em chunks com tamanho controlado;
+- preserva uma pequena sobreposicao entre chunks;
+- tenta cortar em fim de frase ou espaco quando possivel.
 
 ### `services/retrieval.py`
 
@@ -202,7 +216,7 @@ Ela faz:
 - tokenizacao por termos com 3 ou mais caracteres;
 - remocao de palavras comuns;
 - expansao simples de termos academicos em portugues para equivalentes em ingles;
-- calculo de score por frequencia e cobertura da consulta;
+- calculo de score por frequencia de termos inteiros e cobertura da consulta;
 - ordenacao dos trechos mais relevantes.
 
 A expansao portugues-ingles foi adicionada porque muitos artigos academicos estao em ingles, mas o usuario pode fazer perguntas em portugues. Exemplo:
@@ -234,7 +248,7 @@ Ele:
 
 - formata citacoes por arquivo e pagina;
 - monta um bloco de contexto com score, termos encontrados e trecho;
-- monta um prompt final com pergunta do usuario e contexto recuperado;
+- monta um prompt final com pergunta do usuario, prompt base da sidebar e contexto recuperado;
 - gera um resumo das fontes consultadas.
 
 ### `services/tool_service.py`
@@ -264,7 +278,7 @@ O que foi feito:
 2. Criada estrutura modular com `components/`, `services/` e `models/`.
 3. Adicionado `pypdf` em `requirements.txt`.
 4. Criado `SourceFile` para representar os arquivos carregados.
-5. Criado `DocumentChunk` para representar texto extraido por pagina.
+5. Criado `DocumentChunk` para representar texto extraido por pagina e dividido em trechos.
 6. Criado `PdfDiagnostic` para registrar paginas, trechos, preview e erros.
 7. Criado `PdfCorpus` para reunir trechos e diagnosticos.
 8. Implementado `pdf_loader.py` para extrair texto dos PDFs.
@@ -295,7 +309,7 @@ O que foi feito:
 3. Adicionada remocao basica de acentos.
 4. Adicionada remocao de palavras comuns.
 5. Adicionada expansao simples de termos academicos em portugues para ingles.
-6. Criado calculo de score por frequencia dos termos.
+6. Criado calculo de score por frequencia de termos inteiros.
 7. Adicionado bonus por cobertura da consulta.
 8. Ordenacao dos resultados por relevancia.
 9. Criado painel `Teste de busca`.
@@ -330,7 +344,7 @@ O que foi feito:
 1. Criado `context_builder.py`.
 2. Criada funcao para formatar citacoes por arquivo e pagina.
 3. Criada montagem de bloco de contexto com score, termos encontrados e trecho.
-4. Criada montagem de prompt final com pergunta e contexto.
+4. Criada montagem de prompt final com pergunta, prompt base e contexto.
 5. `llm_service.py` passou a receber resultados ranqueados da busca.
 6. A resposta simulada passou a mostrar sintese preliminar, evidencia principal e fontes usadas.
 7. O chat passou a preservar metadados da busca, como score e termos encontrados.
@@ -536,8 +550,8 @@ Uma busca lexical pode nao encontrar bem essa relacao se os termos nao estiverem
 
 Como sera feita:
 
-1. Criar um servico de chunking, por exemplo `chunking.py`.
-2. Dividir textos por tamanho controlado, com pequena sobreposicao.
+1. Reaproveitar ou ajustar o servico `chunking.py`.
+2. Gerar embeddings dos chunks.
 3. Criar um servico de embeddings, por exemplo `embedding_service.py`.
 4. Escolher um modelo de embeddings:
    - local, se a prioridade for estudo/offline;
@@ -616,7 +630,7 @@ pypdf>=5.0.0
 1. Usuario carrega PDFs na sidebar.
 2. O app guarda os arquivos em `st.session_state.sources`.
 3. O diagnostico chama `load_pdf_corpus`.
-4. `pdf_loader.py` extrai texto e gera diagnosticos.
+4. `pdf_loader.py` extrai texto, divide em chunks, cacheia o corpus e gera diagnosticos.
 5. O teste de busca chama `retrieve_ranked_chunks`.
 6. Chat usa os resultados ranqueados para montar contexto e resposta simulada.
 7. Ferramentas usam os resultados ranqueados para montar resumo, mapa mental, tabela e prompts simulados.
@@ -630,7 +644,7 @@ pypdf>=5.0.0
 - PDFs escaneados sem OCR nao terao texto extraivel.
 - A busca simples ainda e lexical, mas ja possui uma expansao limitada de termos academicos portugues-ingles.
 - A expansao portugues-ingles cobre apenas termos comuns; nao e uma traducao completa da pergunta.
-- A extracao ainda usa pagina inteira como trecho; futuramente deve haver divisao em chunks menores.
+- O chunking atual ainda e baseado em tamanho de texto; futuramente pode ser refinado por secoes, titulos e estrutura do artigo.
 
 ## Comandos de Git sugeridos
 

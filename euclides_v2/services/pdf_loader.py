@@ -3,15 +3,18 @@ from __future__ import annotations
 from io import BytesIO
 from typing import Iterable
 
+import streamlit as st
 from pypdf import PdfReader
 
 from models.source import DocumentChunk, PdfCorpus, PdfDiagnostic, SourceFile
+from services.chunking import split_text_into_chunks
 
 
 def extract_pdf_chunks(sources: Iterable[SourceFile]) -> list[DocumentChunk]:
     return load_pdf_corpus(sources).chunks
 
 
+@st.cache_data(show_spinner=False)
 def load_pdf_corpus(sources: Iterable[SourceFile]) -> PdfCorpus:
     chunks: list[DocumentChunk] = []
     diagnostics: list[PdfDiagnostic] = []
@@ -79,13 +82,13 @@ def extract_source_chunks_from_reader(
 
     for index, page in enumerate(reader.pages, start=1):
         text = page.extract_text() or ""
-        cleaned_text = " ".join(text.split())
-        if cleaned_text:
+        page_chunks = split_text_into_chunks(text)
+        for chunk_text in page_chunks:
             chunks.append(
                 DocumentChunk(
                     source_name=source.name,
                     page_number=index,
-                    text=cleaned_text,
+                    text=chunk_text,
                 )
             )
 

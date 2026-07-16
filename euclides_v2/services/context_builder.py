@@ -4,6 +4,12 @@ from models.source import RetrievedChunk
 
 
 MAX_CONTEXT_CHARS_PER_CHUNK = 1200
+DEFAULT_CONTEXT_SYSTEM_PROMPT = (
+    "Voce e o Euclides, um assistente de estudo academico.\n"
+    "Responda somente com base nos trechos recuperados dos PDFs.\n"
+    "Quando usar uma informacao, mencione a fonte no formato arquivo, pagina.\n"
+    "Se os trechos nao forem suficientes, diga isso claramente."
+)
 
 
 def format_citation(result: RetrievedChunk) -> str:
@@ -33,13 +39,18 @@ def build_context_block(results: list[RetrievedChunk]) -> str:
     return "\n\n".join(context_parts)
 
 
-def build_context_prompt(question: str, results: list[RetrievedChunk]) -> str:
+def build_context_prompt(
+    question: str,
+    results: list[RetrievedChunk],
+    system_prompt: str | None = None,
+) -> str:
     context_block = build_context_block(results)
+    prompt_base = (system_prompt or DEFAULT_CONTEXT_SYSTEM_PROMPT).strip()
     return (
-        "Voce e o Euclides, um assistente de estudo academico.\n"
-        "Responda somente com base nos trechos recuperados dos PDFs.\n"
-        "Quando usar uma informacao, mencione a fonte no formato arquivo, pagina.\n"
-        "Se os trechos nao forem suficientes, diga isso claramente.\n\n"
+        f"{prompt_base}\n\n"
+        "Instrucao da tarefa:\n"
+        "Responda usando apenas o contexto recuperado abaixo. "
+        "Se ele nao for suficiente, informe a limitacao.\n\n"
         f"Pergunta do usuario:\n{question}\n\n"
         f"Contexto recuperado:\n{context_block}\n\n"
         "Resposta:"

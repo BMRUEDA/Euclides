@@ -11,6 +11,8 @@ Use apenas as fontes em PDF carregadas pelo usuario.
 Explique com clareza, cite o documento quando possivel e avise quando algo nao estiver nas fontes.
 Modo de ensino: [[TEACHING_MODE]]
 Fontes carregadas: [[SOURCES]]
+Estilo de citacao: [[CITATION_STYLE]]
+Estrategia de resposta: [[ANSWER_STRATEGY]]
 """
 
 
@@ -33,6 +35,8 @@ def final_system_prompt() -> str:
         st.session_state.base_system_prompt
         .replace("[[TEACHING_MODE]]", st.session_state.teaching_mode)
         .replace("[[SOURCES]]", source_names())
+        .replace("[[CITATION_STYLE]]", st.session_state.citation_style)
+        .replace("[[ANSWER_STRATEGY]]", st.session_state.answer_strategy)
     )
 
 
@@ -89,7 +93,7 @@ def render_configuration_sidebar() -> None:
         with st.expander("Model settings", expanded=False):
             st.selectbox(
                 "Provedor",
-                ["Placeholder", "OpenAI", "Anthropic", "Google", "Ollama", "Azure OpenAI"],
+                ["Placeholder", "Ollama", "OpenAI", "Gemini"],
                 key="model_provider",
             )
             st.text_input("Modelo", key="model_name")

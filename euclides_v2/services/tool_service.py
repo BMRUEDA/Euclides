@@ -1,12 +1,23 @@
 from __future__ import annotations
 
 from models.source import RetrievedChunk
-from services.context_builder import build_context_block, build_sources_summary
+from services.context_builder import (
+    DEFAULT_CONTEXT_SYSTEM_PROMPT,
+    build_context_block,
+    build_sources_summary,
+)
 
 
-def build_tool_prompt(tool_name: str, instruction: str, topic: str, results: list[RetrievedChunk]) -> str:
+def build_tool_prompt(
+    tool_name: str,
+    instruction: str,
+    topic: str,
+    results: list[RetrievedChunk],
+    system_prompt: str | None = None,
+) -> str:
+    prompt_base = (system_prompt or DEFAULT_CONTEXT_SYSTEM_PROMPT).strip()
     return (
-        "Voce e o Euclides, um assistente de estudo academico.\n"
+        f"{prompt_base}\n\n"
         f"Ferramenta solicitada: {tool_name}.\n"
         "Use somente os trechos recuperados dos PDFs.\n"
         "Inclua citacoes por arquivo e pagina quando usar informacoes das fontes.\n"
@@ -85,7 +96,11 @@ def build_data_table(topic: str, results: list[RetrievedChunk]) -> list[dict[str
     ]
 
 
-def build_table_prompt(topic: str, results: list[RetrievedChunk]) -> str:
+def build_table_prompt(
+    topic: str,
+    results: list[RetrievedChunk],
+    system_prompt: str | None = None,
+) -> str:
     return build_tool_prompt(
         tool_name="Tabela de dados",
         instruction=(
@@ -94,10 +109,15 @@ def build_table_prompt(topic: str, results: list[RetrievedChunk]) -> str:
         ),
         topic=topic,
         results=results,
+        system_prompt=system_prompt,
     )
 
 
-def build_summary_prompt(topic: str, results: list[RetrievedChunk]) -> str:
+def build_summary_prompt(
+    topic: str,
+    results: list[RetrievedChunk],
+    system_prompt: str | None = None,
+) -> str:
     return build_tool_prompt(
         tool_name="Resumo",
         instruction=(
@@ -106,10 +126,15 @@ def build_summary_prompt(topic: str, results: list[RetrievedChunk]) -> str:
         ),
         topic=topic,
         results=results,
+        system_prompt=system_prompt,
     )
 
 
-def build_mind_map_prompt(topic: str, results: list[RetrievedChunk]) -> str:
+def build_mind_map_prompt(
+    topic: str,
+    results: list[RetrievedChunk],
+    system_prompt: str | None = None,
+) -> str:
     return build_tool_prompt(
         tool_name="Mapa mental",
         instruction=(
@@ -118,4 +143,5 @@ def build_mind_map_prompt(topic: str, results: list[RetrievedChunk]) -> str:
         ),
         topic=topic,
         results=results,
+        system_prompt=system_prompt,
     )

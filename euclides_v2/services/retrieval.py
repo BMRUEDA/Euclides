@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 import re
 import unicodedata
 
@@ -89,12 +90,12 @@ def expand_query_terms(query_terms: list[str]) -> list[str]:
 
 
 def score_chunk(query_terms: list[str], chunk: DocumentChunk) -> RetrievedChunk | None:
-    normalized_text = normalize_text(chunk.text)
+    chunk_term_counts = Counter(tokenize(chunk.text))
     matched_terms: list[str] = []
     score = 0.0
 
     for term in query_terms:
-        frequency = normalized_text.count(term)
+        frequency = chunk_term_counts[term]
         if frequency <= 0:
             continue
 
