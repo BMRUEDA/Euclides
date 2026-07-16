@@ -561,7 +561,7 @@ Uso recomendado:
 
 - `Lexical`: melhor escolha quando o objetivo e custo zero, velocidade e termos exatos;
 - `Vetorial`: util para comparar a recuperacao semantica isolada;
-- `Hibrida`: melhor escolha quando o usuario aceita usar embeddings, pois combina significado com termos exatos pelo mesmo custo aproximado do modo vetorial.
+- `Hibrida`: melhor escolha quando o usuario aceita usar embeddings, pois combina significado com termos exatos e reduz custo ao gerar embeddings somente dos melhores candidatos lexicais.
 
 O que esta fase deve entregar:
 
@@ -628,7 +628,8 @@ Motivo:
 
 - busca semantica entende melhor significado entre idiomas;
 - busca lexical ainda e forte para termos tecnicos, siglas, nomes de autores, datasets e palavras exatas;
-- combinar as duas tende a recuperar contexto mais confiavel do que usar apenas uma.
+- combinar as duas tende a recuperar contexto mais confiavel do que usar apenas uma;
+- no modo `Hibrida`, a busca lexical primeiro limita os candidatos e a busca semantica reordena esse subconjunto, reduzindo chamadas de embeddings.
 
 Resultado esperado da Fase 6:
 
@@ -638,7 +639,8 @@ Observacao de custo:
 
 - o modo padrao continua `Lexical`, sem chamadas de embeddings;
 - `Vetorial` e `Hibrida` podem chamar a API de embeddings do Gemini;
-- no prototipo atual, `Vetorial` e `Hibrida` tem custo aproximado parecido, porque ambos geram embeddings da consulta e dos chunks;
+- `Vetorial` pode gerar embeddings para todos os chunks;
+- `Hibrida` gera embeddings apenas para os melhores candidatos lexicais, o que tende a custar menos em PDFs maiores;
 - os embeddings sao cacheados pelo Streamlit para reduzir chamadas repetidas no mesmo conjunto de textos.
 
 ## Como executar

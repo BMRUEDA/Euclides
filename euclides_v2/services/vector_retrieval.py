@@ -8,6 +8,8 @@ from services.retrieval import retrieve_ranked_chunks, tokenize
 LEXICAL_MODE = "Lexical"
 VECTOR_MODE = "Vetorial"
 HYBRID_MODE = "Hibrida"
+HYBRID_CANDIDATE_MULTIPLIER = 4
+MIN_HYBRID_CANDIDATES = 12
 
 
 def retrieve_chunks(
@@ -70,10 +72,15 @@ def hybrid_retrieve(
     chunks: list[DocumentChunk],
     limit: int = 5,
 ) -> list[RetrievedChunk]:
-    lexical_results = retrieve_ranked_chunks(query=query, chunks=chunks, limit=limit * 2)
+    candidate_limit = max(limit * HYBRID_CANDIDATE_MULTIPLIER, MIN_HYBRID_CANDIDATES)
+    lexical_results = retrieve_ranked_chunks(query=query, chunks=chunks, limit=candidate_limit)
+    candidate_chunks = [result.chunk for result in lexical_results]
+
+    if not candidate_chunks:
+        return semantic_retrieve_with_fallback(query, chunks, limit)
 
     try:
-        semantic_results = semantic_retrieve(query, chunks, limit * 2)
+        semantic_results = semantic_retrieve(query, candidate_chunks, candidate_limit)
     except EmbeddingError:
         return lexical_results[:limit]
 
