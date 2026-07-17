@@ -29,6 +29,13 @@ Fases implementadas ate agora:
 
 O modo padrao continua `Placeholder` e `Lexical`, para evitar custo de API por acidente. Para usar Gemini real ou embeddings, e necessario configurar `GEMINI_API_KEY`.
 
+Escopo final definido:
+
+- Gemini continua como provedor real ja implementado.
+- OpenAI sera implementado como segundo provedor real via API.
+- Ollama e modelos locais nao serao implementados por questoes tecnicas e porque o projeto nao precisa rodar modelo local.
+- O projeto sera considerado concluido depois da Fase 8A, exportacao de materiais de estudo, e da Fase 8C, suporte OpenAI.
+
 ## Objetivo da v2
 
 Construir uma arquitetura simples e expansivel para:
@@ -39,7 +46,7 @@ Construir uma arquitetura simples e expansivel para:
 - buscar trechos relevantes dentro dos textos;
 - responder no chat usando contexto recuperado;
 - gerar ferramentas de resumo, mapa mental, tabela, citas, flashcards e quiz;
-- manter a escolha futura entre provedores como Ollama, OpenAI e Gemini.
+- manter provedores por API com Gemini e OpenAI.
 
 ## Arquitetura planejada
 
@@ -60,16 +67,16 @@ Euclides
    |     |        |            |
    +-----+--------+------------+
          |
-   +-----+--------+
-   |     |        |
- Ollama OpenAI  Gemini
-   |     |        |
-   +-----+--------+
+   +--------+--------+
+   |        |        |
+ Gemini   OpenAI  Placeholder
+   |        |        |
+   +--------+--------+
          |
   Resposta final
 ```
 
-O app ja possui modo simulado (`Placeholder`) e chamada real inicial ao Gemini. O foco atual e estabilizar a recuperacao lexical/vetorial, validar as ferramentas academicas e preparar a proxima fase sem quebrar a arquitetura simples.
+O app ja possui modo simulado (`Placeholder`) e chamada real inicial ao Gemini. O foco final e adicionar OpenAI como segundo provedor de API e exportar materiais de estudo para tornar o projeto pratico e concluido.
 
 ## Estrutura de pastas
 
@@ -265,11 +272,11 @@ Na versao com RAG vetorial, a busca semantica deve ser a estrategia principal. A
 
 ### `services/llm_service.py`
 
-Servico placeholder para resposta com modelo.
+Servico central para respostas com modelo.
 
-Atualmente nao chama OpenAI, Gemini nem Ollama. Ele apenas monta uma resposta simulada usando os trechos recuperados.
+Atualmente mantem o modo `Placeholder` simulado e ja chama Gemini via API quando esse provedor esta selecionado. OpenAI sera adicionado como segundo provedor real. Ollama nao faz parte do escopo final.
 
-Esse isolamento e intencional: quando um modelo real for conectado, a mudanca principal deve acontecer neste arquivo.
+Esse isolamento e intencional: provedores reais devem ser conectados principalmente neste arquivo, sem espalhar chamadas de API pelos componentes.
 
 ### `services/context_builder.py`
 
@@ -471,13 +478,15 @@ Status: minimo funcional implementado com Gemini.
 
 Objetivo: conectar um provedor de LLM.
 
-Provedores planejados:
+Provedores planejados para o fechamento do projeto:
 
 - Gemini como provedor real inicial via API;
-- OpenAI como proximo provedor via API, ainda nao implementado;
-- Ollama adiado para esta maquina por limitacao de RAM.
+- OpenAI como segundo provedor real via API, ainda nao implementado;
+- Placeholder como modo local simulado, sem custo e sem chamada externa.
 
-O design atual ja deixa a selecao visual na sidebar com `Placeholder`, `Ollama`, `OpenAI` e `Gemini`. O primeiro provedor real conectado e o Gemini.
+Ollama e modelos locais ficam fora do escopo final por questoes tecnicas da maquina e porque o projeto nao precisa executar LLM localmente.
+
+O design final deve manter a selecao visual na sidebar com `Placeholder`, `OpenAI` e `Gemini`.
 
 Preparacao ja feita:
 
@@ -511,7 +520,7 @@ O que esta fase deve entregar:
 - aplicar o `Final system prompt preview` na montagem da chamada;
 - respeitar configuracoes da sidebar, como provedor, modelo, temperatura e max tokens;
 - usar o mesmo servico de modelo para chat e ferramentas;
-- exibir erros amigaveis quando chave de API, modelo local ou conexao nao estiverem disponiveis.
+- exibir erros amigaveis quando chave de API, modelo de API ou conexao nao estiverem disponiveis.
 
 Arquitetura proposta para a Fase 5:
 
@@ -521,9 +530,9 @@ chat.py / study_tools.py
   -> context_builder.py
   -> llm_service.py
   -> provider selecionado
-       -> Ollama
-       -> OpenAI
        -> Gemini
+       -> OpenAI
+       -> Placeholder
   -> resposta final
 ```
 
@@ -532,8 +541,8 @@ Como sera feita:
 1. Criar uma interface comum em `llm_service.py`, por exemplo `generate_response(prompt, settings)`. Implementado.
 2. Criar adaptadores internos para cada provedor:
    - `call_gemini`: implementado;
-   - `call_openai`: planejado;
-   - `call_ollama`: adiado por limitacao de RAM nesta maquina.
+   - `call_openai`: planejado para a Fase 8C;
+   - `Placeholder`: implementado como modo simulado.
 3. Ler da sidebar:
    - provedor;
    - nome do modelo;
@@ -545,16 +554,15 @@ Como sera feita:
 7. Tratar erros de forma clara:
    - modelo nao encontrado;
    - API key ausente;
-   - Ollama desligado;
    - timeout;
    - limite de tokens.
 
 Estrategia recomendada:
 
-- Usar Gemini como provedor inicial, porque funciona nesta maquina com pouca RAM.
+- Usar Gemini como provedor inicial.
 - Manter `Placeholder` como modo sem custo para testes de interface e recuperacao.
-- Adicionar OpenAI futuramente se for necessario comparar qualidade ou custo.
-- Adiar Ollama local enquanto a maquina tiver cerca de 4 GB de RAM.
+- Adicionar OpenAI para completar o suporte a provedores por API.
+- Nao implementar Ollama nem outro modelo local neste projeto.
 - Nao colocar chaves de API no codigo.
 - Manter a resposta sempre baseada nos trechos recuperados, nao em conhecimento solto do modelo.
 
@@ -563,7 +571,6 @@ Exemplo de variaveis futuras:
 ```text
 OPENAI_API_KEY
 GEMINI_API_KEY
-OLLAMA_BASE_URL
 ```
 
 Resultado esperado da Fase 5:
@@ -753,9 +760,8 @@ Em PowerShell:
 $env:GEMINI_API_KEY="SUA_CHAVE_AQUI"
 ```
 
-Dependencias futuras podem entrar junto com outros adaptadores da Fase 5, por exemplo:
+Dependencias futuras podem entrar junto com o adaptador OpenAI, por exemplo:
 
-- Ollama: cliente HTTP, como `requests` ou `httpx`;
 - OpenAI: SDK oficial `openai` ou cliente HTTP;
 - Gemini avancado: SDK do Google, se for necessario usar recursos alem da chamada REST atual.
 
@@ -769,10 +775,12 @@ Dependencias futuras podem entrar junto com outros adaptadores da Fase 5, por ex
 6. Chat usa `retrieve_chunks_with_status`, respeitando o modo `Lexical`, `Vetorial` ou `Hibrida`.
 7. Ferramentas usam a mesma recuperacao configurada na sidebar para montar resumo, mapa mental, tabela, citas, flashcards, quiz e prompts.
 8. A resposta final usa Gemini quando o provedor esta selecionado e `GEMINI_API_KEY` existe; caso contrario, o modo `Placeholder` continua simulado.
+9. OpenAI sera adicionado como segundo provedor por API antes do encerramento do projeto.
 
 ## Limitacoes atuais
 
-- A LLM real inicial e Gemini; Ollama e OpenAI ainda nao foram conectados.
+- A LLM real inicial e Gemini; OpenAI ainda sera conectado.
+- Ollama e modelos locais nao fazem parte do escopo final.
 - Embeddings existem via Gemini, mas dependem de `GEMINI_API_KEY`.
 - O indice vetorial ainda e um prototipo em memoria/cache do Streamlit, nao um banco vetorial persistente como FAISS, Chroma ou pgvector.
 - PDFs escaneados sem OCR nao terao texto extraivel.
@@ -780,9 +788,9 @@ Dependencias futuras podem entrar junto com outros adaptadores da Fase 5, por ex
 - A expansao portugues-ingles cobre apenas termos comuns; nao e uma traducao completa da pergunta.
 - O chunking atual ainda e baseado em tamanho de texto; futuramente pode ser refinado por secoes, titulos e estrutura do artigo.
 
-## Proximos passos recomendados
+## Proximos passos finais
 
-Antes de iniciar qualquer proxima fase, testar o app com PDFs reais e confirmar que as Fases 6 e 7 estao estaveis.
+Antes de iniciar as fases finais, testar o app com PDFs reais e confirmar que as Fases 6 e 7 estao estaveis.
 
 Prioridade 1 - Validacao:
 
@@ -799,19 +807,36 @@ Prioridade 2 - Diagnostico da recuperacao:
 3. Mostrar quando embeddings foram usados.
 4. Mostrar aviso de custo potencial em modos `Vetorial` e `Hibrida`.
 
-Prioridade 3 - Fase 8A, exportacao de materiais:
+Prioridade 3 - Fase 8C, suporte OpenAI:
+
+1. Implementar `call_openai` em `llm_service.py`.
+2. Usar `OPENAI_API_KEY` como variavel de ambiente.
+3. Manter a mesma interface `generate_response(prompt, settings)`.
+4. Fazer chat e ferramentas funcionarem com `Placeholder`, `Gemini` e `OpenAI`.
+5. Exibir erros amigaveis para chave ausente, modelo invalido, timeout e limite de uso.
+
+Prioridade 4 - Fase 8A, exportacao de materiais:
 
 1. Exportar respostas do chat para Markdown ou TXT.
 2. Exportar resumo, mapa mental, tabela, citas, flashcards e quiz.
 3. Manter citacoes de fonte e pagina no arquivo exportado.
 4. Evitar dependencias novas inicialmente.
 
-Outras fases possiveis:
+Encerramento do projeto:
+
+O projeto sera considerado concluido quando:
+
+1. Gemini e OpenAI estiverem disponiveis como provedores por API.
+2. O modo `Placeholder` continuar funcionando para testes sem custo.
+3. As ferramentas de estudo puderem exportar materiais em Markdown ou TXT.
+4. O README documentar como configurar `GEMINI_API_KEY` e `OPENAI_API_KEY`.
+
+Fora do escopo final:
 
 - Fase 8B: persistencia local de PDFs, conversas e resultados.
-- Fase 8C: adicionar OpenAI como segundo provedor real.
 - Fase 8D: OCR para PDFs escaneados.
 - Fase 8E: indice vetorial persistente com FAISS, Chroma ou pgvector.
+- Ollama ou qualquer outro modelo local.
 
 ## Comandos de Git sugeridos
 
