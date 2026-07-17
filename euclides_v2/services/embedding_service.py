@@ -19,16 +19,20 @@ class EmbeddingError(RuntimeError):
     pass
 
 
+def has_embedding_api_key() -> bool:
+    return bool(os.getenv("GEMINI_API_KEY", "").strip())
+
+
 @st.cache_data(show_spinner=False)
 def embed_text(
     text: str,
     task_type: str,
     model_name: str = DEFAULT_EMBEDDING_MODEL,
 ) -> list[float]:
-    api_key = os.getenv("GEMINI_API_KEY", "").strip()
-    if not api_key:
+    if not has_embedding_api_key():
         raise EmbeddingError("GEMINI_API_KEY nao esta configurada.")
 
+    api_key = os.getenv("GEMINI_API_KEY", "").strip()
     url = EMBEDDING_API_URL.format(model=quote(model_name, safe=""))
     payload = {
         "taskType": task_type,

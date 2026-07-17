@@ -46,7 +46,10 @@ def main() -> None:
 
     left, right = st.columns([1.25, 1], gap="large")
     with left:
-        render_chat()
+        if "Chat" in st.session_state.active_tools:
+            render_chat()
+        else:
+            st.info("Chat desativado. Ative a ferramenta Chat na sidebar para perguntar sobre os PDFs.")
     with right:
         render_source_diagnostics()
         render_retrieval_preview()

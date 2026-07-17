@@ -4,6 +4,31 @@ Esta pasta contem uma evolucao separada do Euclides original. A proposta e conti
 
 O Euclides original funciona como prototipo visual. A `euclides_v2` comeca a transformar esse prototipo em uma aplicacao funcional para estudo com PDFs, busca de trechos, chat com contexto e ferramentas academicas.
 
+## Regra de colaboracao
+
+Antes de qualquer modificacao em arquivos do projeto, o agente deve:
+
+1. Informar quais arquivos pretende modificar.
+2. Explicar o motivo da mudanca.
+3. Aguardar confirmacao explicita do usuario.
+4. Aplicar somente as mudancas aprovadas.
+
+Esta regra vale para codigo, README, configuracoes e comandos que alterem arquivos.
+
+## Estado atual
+
+Fases implementadas ate agora:
+
+- Fase 1: leitura real de PDFs e diagnostico das fontes.
+- Fase 2: busca lexical simples com expansao academica portugues-ingles.
+- Fase 3: chat com contexto recuperado.
+- Fase 4: ferramentas de estudo com contexto.
+- Fase 5: modelo real minimo via Gemini.
+- Fase 6: RAG vetorial inicial com embeddings Gemini, indice em memoria e busca hibrida.
+- Fase 7: ferramentas academicas extras e controle real de `Active tools`.
+
+O modo padrao continua `Placeholder` e `Lexical`, para evitar custo de API por acidente. Para usar Gemini real ou embeddings, e necessario configurar `GEMINI_API_KEY`.
+
 ## Objetivo da v2
 
 Construir uma arquitetura simples e expansivel para:
@@ -12,8 +37,8 @@ Construir uma arquitetura simples e expansivel para:
 - extrair texto real dos arquivos;
 - diagnosticar se o PDF foi lido corretamente;
 - buscar trechos relevantes dentro dos textos;
-- preparar o chat para responder usando contexto recuperado;
-- preparar ferramentas de resumo, mapa mental e tabela;
+- responder no chat usando contexto recuperado;
+- gerar ferramentas de resumo, mapa mental, tabela, citas, flashcards e quiz;
 - manter a escolha futura entre provedores como Ollama, OpenAI e Gemini.
 
 ## Arquitetura planejada
@@ -31,7 +56,7 @@ Euclides
          |
    +-----+--------+------------+
    |     |        |            |
- Chat  Resumo  Mapa mental  Tabela
+ Chat  Resumo  Mapa mental  Tabela  Citas  Flashcards  Quiz
    |     |        |            |
    +-----+--------+------------+
          |
@@ -44,7 +69,7 @@ Euclides
   Resposta final
 ```
 
-Nesta etapa, a parte de modelo ainda e simulada. O foco atual e garantir que o PDF seja lido e que a busca inicial consiga encontrar trechos uteis.
+O app ja possui modo simulado (`Placeholder`) e chamada real inicial ao Gemini. O foco atual e estabilizar a recuperacao lexical/vetorial, validar as ferramentas academicas e preparar a proxima fase sem quebrar a arquitetura simples.
 
 ## Estrutura de pastas
 
@@ -64,10 +89,12 @@ euclides_v2/
   services/
     chunking.py
     context_builder.py
+    embedding_service.py
     llm_service.py
     pdf_loader.py
     retrieval.py
     tool_service.py
+    vector_retrieval.py
 ```
 
 ## Responsabilidade dos arquivos
@@ -83,7 +110,8 @@ Ele:
 - renderiza chat;
 - renderiza diagnostico das fontes;
 - renderiza painel de teste de busca;
-- renderiza ferramentas de estudo.
+- renderiza ferramentas de estudo;
+- respeita a selecao de `Active tools` para exibir ou ocultar o chat.
 
 ### `components/sidebar.py`
 
@@ -160,8 +188,11 @@ Inclui:
 - resumo;
 - mapa mental;
 - tabela de dados.
+- citas;
+- flashcards;
+- quiz.
 
-Atualmente, as ferramentas usam a mesma busca ranqueada do chat e retornam saidas simuladas baseadas nos trechos recuperados.
+As ferramentas usam a mesma busca ranqueada do chat e podem retornar saidas simuladas ou respostas reais via provedor de modelo selecionado.
 
 Cada ferramenta tambem mostra o prompt preparado para uma LLM futura.
 
@@ -549,13 +580,15 @@ O que foi implementado nesta primeira versao:
 
 1. Reaproveitamento do chunking ja existente.
 2. Criacao de `embedding_service.py` para gerar embeddings via Gemini.
-3. Criacao de `vector_retrieval.py` para busca vetorial e busca hibrida.
+3. Criacao de `vector_retrieval.py` para busca vetorial, indice em memoria e busca hibrida.
 4. Similaridade por cosseno em memoria, sem FAISS ou Chroma.
 5. Modo de busca selecionavel na sidebar:
    - `Lexical`;
    - `Vetorial`;
    - `Hibrida`.
 6. Fallback automatico para busca lexical quando embeddings falham ou `GEMINI_API_KEY` nao esta configurada.
+7. Aviso visual na sidebar quando o modo vetorial/hibrido esta ativo sem chave de embeddings.
+8. Aviso no chat, no painel de busca e nas ferramentas quando a recuperacao vetorial/hibrida falha e volta para lexical.
 
 Uso recomendado:
 
@@ -643,6 +676,44 @@ Observacao de custo:
 - `Hibrida` gera embeddings apenas para os melhores candidatos lexicais, o que tende a custar menos em PDFs maiores;
 - os embeddings sao cacheados pelo Streamlit para reduzir chamadas repetidas no mesmo conjunto de textos.
 
+## Fase 7 - Ferramentas academicas extras
+
+Status: implementada em versao inicial.
+
+Objetivo: transformar a lista `Active tools` da sidebar em controle real da interface e adicionar ferramentas de estudo adicionais usando o mesmo contexto recuperado pelo RAG.
+
+O que foi feito:
+
+1. `Active tools` passou a controlar se o chat fica visivel.
+2. `Active tools` passou a controlar quais abas aparecem em `Ferramentas de estudo`.
+3. Adicionada ferramenta `Citas`.
+4. Adicionada ferramenta `Flashcards`.
+5. Adicionada ferramenta `Quiz`.
+6. As novas ferramentas usam `retrieve_chunks_with_status`, respeitando `Lexical`, `Vetorial` e `Hibrida`.
+7. As novas ferramentas mostram fallback quando embeddings falham.
+8. As novas ferramentas funcionam em modo `Placeholder` com saida simulada.
+9. Quando um provedor real esta selecionado, as novas ferramentas enviam prompts especificos para a LLM.
+
+Fluxo das ferramentas:
+
+```text
+topico do usuario
+  -> recuperacao configurada na sidebar
+  -> trechos ranqueados
+  -> prompt especifico da ferramenta
+  -> saida simulada ou LLM real
+```
+
+Como testar:
+
+1. Abrir `Active tools` na sidebar.
+2. Marcar ou desmarcar `Chat`, `Resumo`, `Mapa mental`, `Tabela de dados`, `Citas`, `Flashcards` e `Quiz`.
+3. Confirmar que as abas mudam conforme a selecao.
+4. Carregar um PDF com texto extraivel.
+5. Informar um topico em uma ferramenta.
+6. Testar em modo `Placeholder` e depois com `Gemini`.
+7. Testar `Vetorial` ou `Hibrida` para confirmar que as ferramentas usam a mesma recuperacao do chat.
+
 ## Como executar
 
 Dentro da raiz do repositorio:
@@ -694,20 +765,53 @@ Dependencias futuras podem entrar junto com outros adaptadores da Fase 5, por ex
 2. O app guarda os arquivos em `st.session_state.sources`.
 3. O diagnostico chama `load_pdf_corpus`.
 4. `pdf_loader.py` extrai texto, divide em chunks, cacheia o corpus e gera diagnosticos.
-5. O teste de busca chama `retrieve_ranked_chunks`.
-6. Chat usa os resultados ranqueados para montar contexto e resposta simulada.
-7. Ferramentas usam os resultados ranqueados para montar resumo, mapa mental, tabela e prompts simulados.
+5. O teste de busca chama `retrieve_chunks_with_status`.
+6. Chat usa `retrieve_chunks_with_status`, respeitando o modo `Lexical`, `Vetorial` ou `Hibrida`.
+7. Ferramentas usam a mesma recuperacao configurada na sidebar para montar resumo, mapa mental, tabela, citas, flashcards, quiz e prompts.
 8. A resposta final usa Gemini quando o provedor esta selecionado e `GEMINI_API_KEY` existe; caso contrario, o modo `Placeholder` continua simulado.
 
 ## Limitacoes atuais
 
 - A LLM real inicial e Gemini; Ollama e OpenAI ainda nao foram conectados.
-- Ainda nao ha embeddings.
-- Ainda nao ha banco vetorial.
+- Embeddings existem via Gemini, mas dependem de `GEMINI_API_KEY`.
+- O indice vetorial ainda e um prototipo em memoria/cache do Streamlit, nao um banco vetorial persistente como FAISS, Chroma ou pgvector.
 - PDFs escaneados sem OCR nao terao texto extraivel.
-- A busca simples ainda e lexical, mas ja possui uma expansao limitada de termos academicos portugues-ingles.
+- O modo padrao ainda e lexical, mas ja existe busca vetorial e busca hibrida selecionavel na sidebar.
 - A expansao portugues-ingles cobre apenas termos comuns; nao e uma traducao completa da pergunta.
 - O chunking atual ainda e baseado em tamanho de texto; futuramente pode ser refinado por secoes, titulos e estrutura do artigo.
+
+## Proximos passos recomendados
+
+Antes de iniciar qualquer proxima fase, testar o app com PDFs reais e confirmar que as Fases 6 e 7 estao estaveis.
+
+Prioridade 1 - Validacao:
+
+1. Testar chat com `Placeholder` e com `Gemini`.
+2. Testar busca `Lexical`, `Vetorial` e `Hibrida`.
+3. Confirmar fallback para lexical quando `GEMINI_API_KEY` estiver ausente ou embeddings falharem.
+4. Testar ferramentas `Resumo`, `Mapa mental`, `Tabela de dados`, `Citas`, `Flashcards` e `Quiz`.
+5. Conferir se as respostas citam arquivo e pagina.
+
+Prioridade 2 - Diagnostico da recuperacao:
+
+1. Mostrar com mais clareza o modo solicitado e o modo efetivo.
+2. Mostrar quantidade de chunks analisados e recuperados.
+3. Mostrar quando embeddings foram usados.
+4. Mostrar aviso de custo potencial em modos `Vetorial` e `Hibrida`.
+
+Prioridade 3 - Fase 8A, exportacao de materiais:
+
+1. Exportar respostas do chat para Markdown ou TXT.
+2. Exportar resumo, mapa mental, tabela, citas, flashcards e quiz.
+3. Manter citacoes de fonte e pagina no arquivo exportado.
+4. Evitar dependencias novas inicialmente.
+
+Outras fases possiveis:
+
+- Fase 8B: persistencia local de PDFs, conversas e resultados.
+- Fase 8C: adicionar OpenAI como segundo provedor real.
+- Fase 8D: OCR para PDFs escaneados.
+- Fase 8E: indice vetorial persistente com FAISS, Chroma ou pgvector.
 
 ## Comandos de Git sugeridos
 

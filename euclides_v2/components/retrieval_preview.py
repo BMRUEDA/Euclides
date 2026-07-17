@@ -3,7 +3,7 @@ from __future__ import annotations
 import streamlit as st
 
 from services.pdf_loader import load_pdf_corpus
-from services.vector_retrieval import retrieve_chunks
+from services.vector_retrieval import retrieve_chunks_with_status
 
 
 def render_retrieval_preview() -> None:
@@ -35,12 +35,18 @@ def render_retrieval_preview() -> None:
             st.warning("Nao ha texto extraivel para buscar.")
             return
 
-        results = retrieve_chunks(
+        retrieval_result = retrieve_chunks_with_status(
             query=query,
             chunks=corpus.chunks,
             limit=st.session_state.retrieval_k,
             mode=st.session_state.retrieval_mode,
         )
+        results = retrieval_result.chunks
+
+        if retrieval_result.warning:
+            st.warning(retrieval_result.warning)
+        else:
+            st.caption(f"Modo efetivo: {retrieval_result.effective_mode}")
 
         if not results:
             st.warning("Nenhum trecho encontrado para essa consulta.")

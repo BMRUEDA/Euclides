@@ -3,6 +3,7 @@ from __future__ import annotations
 import streamlit as st
 
 from models.source import SourceFile
+from services.embedding_service import has_embedding_api_key
 from services.llm_service import DEFAULT_GEMINI_MODEL, LlmSettings
 
 
@@ -132,6 +133,14 @@ def render_configuration_sidebar() -> None:
                 st.caption("Usa embeddings Gemini quando GEMINI_API_KEY esta configurada.")
             else:
                 st.caption("Recomendado para qualidade: embeddings Gemini + busca lexical.")
+
+            if st.session_state.retrieval_mode != "Lexical":
+                if has_embedding_api_key():
+                    st.caption("GEMINI_API_KEY detectada para embeddings.")
+                else:
+                    st.warning(
+                        "GEMINI_API_KEY nao configurada. A busca vai voltar para lexical.",
+                    )
             st.number_input(
                 "Trechos recuperados por pergunta",
                 min_value=1,

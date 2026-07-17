@@ -98,6 +98,71 @@ def build_data_table(topic: str, results: list[RetrievedChunk]) -> list[dict[str
     ]
 
 
+def build_citations(topic: str, results: list[RetrievedChunk]) -> str:
+    if not results:
+        return "Nenhum trecho encontrado para listar citacoes."
+
+    items = []
+    for index, result in enumerate(results, start=1):
+        chunk = result.chunk
+        items.append(
+            f"{index}. \"{chunk.text[:360]}\" "
+            f"({chunk.source_name}, p. {chunk.page_number})"
+        )
+
+    return (
+        f"### Citas simuladas: {topic}\n\n"
+        + "\n\n".join(items)
+        + "\n\n"
+        f"**Fontes usadas:** {build_sources_summary(results)}"
+    )
+
+
+def build_flashcards(topic: str, results: list[RetrievedChunk]) -> list[dict[str, str]]:
+    if not results:
+        return []
+
+    cards = []
+    for index, result in enumerate(results[:6], start=1):
+        chunk = result.chunk
+        terms = ", ".join(result.matched_terms) or topic
+        cards.append(
+            {
+                "Frente": f"{index}. O que o documento indica sobre {terms}?",
+                "Verso": (
+                    f"{chunk.text[:320]} "
+                    f"({chunk.source_name}, p. {chunk.page_number})"
+                ),
+            }
+        )
+
+    return cards
+
+
+def build_quiz(topic: str, results: list[RetrievedChunk]) -> str:
+    if not results:
+        return "Nenhum trecho encontrado para gerar quiz."
+
+    questions = []
+    for index, result in enumerate(results[:5], start=1):
+        chunk = result.chunk
+        terms = ", ".join(result.matched_terms) or topic
+        questions.append(
+            f"{index}. Explique, com base na fonte, como o trecho se relaciona com "
+            f"`{terms}`.\n"
+            f"   - Gabarito esperado: mencionar a evidencia em "
+            f"({chunk.source_name}, p. {chunk.page_number}).\n"
+            f"   - Evidencia: {chunk.text[:260]}"
+        )
+
+    return (
+        f"### Quiz simulado: {topic}\n\n"
+        + "\n\n".join(questions)
+        + "\n\n"
+        f"**Fontes usadas:** {build_sources_summary(results)}"
+    )
+
+
 def build_table_prompt(
     topic: str,
     results: list[RetrievedChunk],
@@ -109,6 +174,57 @@ def build_table_prompt(
             "Extraia campos relevantes em uma tabela Markdown. Cada linha deve conter "
             "documento, pagina, campo, valor extraido, citacao e observacao quando houver incerteza. "
             "Use 'Nao encontrado nos PDFs' quando um campo nao aparecer no contexto."
+        ),
+        topic=topic,
+        results=results,
+        system_prompt=system_prompt,
+    )
+
+
+def build_citations_prompt(
+    topic: str,
+    results: list[RetrievedChunk],
+    system_prompt: str | None = None,
+) -> str:
+    return build_tool_prompt(
+        tool_name="Citas",
+        instruction=(
+            "Selecione as citacoes mais uteis para estudo academico. Para cada uma, "
+            "inclua citacao curta, documento, pagina, motivo de relevancia e limite de uso."
+        ),
+        topic=topic,
+        results=results,
+        system_prompt=system_prompt,
+    )
+
+
+def build_flashcards_prompt(
+    topic: str,
+    results: list[RetrievedChunk],
+    system_prompt: str | None = None,
+) -> str:
+    return build_tool_prompt(
+        tool_name="Flashcards",
+        instruction=(
+            "Crie flashcards em Markdown com frente e verso. Cada verso deve ser curto, "
+            "baseado no contexto e conter citacao da fonte."
+        ),
+        topic=topic,
+        results=results,
+        system_prompt=system_prompt,
+    )
+
+
+def build_quiz_prompt(
+    topic: str,
+    results: list[RetrievedChunk],
+    system_prompt: str | None = None,
+) -> str:
+    return build_tool_prompt(
+        tool_name="Quiz",
+        instruction=(
+            "Crie um quiz curto com perguntas, alternativas quando couber, resposta correta "
+            "e justificativa citada. Nao use conhecimento fora dos trechos recuperados."
         ),
         topic=topic,
         results=results,
