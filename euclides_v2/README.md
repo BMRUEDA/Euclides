@@ -317,6 +317,507 @@ Ele:
 - gera nomes de arquivo seguros;
 - nao adiciona dependencias externas.
 
+## Decisoes de engenharia de LLM
+
+Esta secao resume as decisoes tecnicas relacionadas ao uso de IA generativa no Euclides v2.
+
+### Framework escolhido
+
+O projeto usa chamadas REST diretas para Gemini e OpenAI, usando bibliotecas padrao do Python.
+
+Decisao:
+
+- nao usar SDKs oficiais neste fechamento;
+- nao usar LangChain ou LangGraph;
+- nao usar framework de agentes.
+
+Motivos:
+
+- o fluxo do app e simples e controlado: upload de PDFs, recuperacao de trechos, montagem de prompt e chamada ao modelo;
+- chamadas REST reduzem dependencias externas;
+- o codigo fica mais facil de auditar para fins academicos;
+- o isolamento em `llm_service.py` permite trocar ou adicionar provedores sem espalhar logica de API pela interface.
+
+Trade-off:
+
+- SDKs poderiam simplificar alguns recursos avancados;
+- LangChain ou LangGraph poderiam ajudar em fluxos agenticos maiores;
+- para este projeto, a complexidade adicional nao se justifica.
+
+### Provedores e modelos
+
+Provedores disponiveis:
+
+- `Placeholder`: modo simulado, sem custo e sem chamada externa;
+- `Gemini`: provedor real via API;
+- `OpenAI`: segundo provedor real via API.
+
+Modelos padrao:
+
+- Gemini: `gemini-3.1-flash-lite`;
+- OpenAI: `gpt-5`;
+- Embeddings: `gemini-embedding-001`.
+
+Decisoes:
+
+- `Placeholder` fica como padrao para evitar custo acidental;
+- Gemini foi usado primeiro por ser adequado para chamadas REST simples e embeddings;
+- OpenAI foi adicionado como segundo provedor para cumprir o requisito de IA generativa com alternativa de modelo;
+- Ollama e modelos locais ficaram fora do escopo por limitacoes tecnicas da maquina e porque o projeto nao precisa rodar LLM local.
+
+### Modelos pagos vs. modelos locais
+
+Escolha atual:
+
+- o projeto usa provedores pagos/externos por API: Gemini e OpenAI;
+- o projeto tambem mantem `Placeholder` para testar fluxo, RAG, prompts e exportacao sem custo;
+- nenhum modelo local foi integrado.
+
+Por que escolher Gemini e OpenAI:
+
+- qualidade de resposta maior para tarefas academicas;
+- melhor capacidade de seguir instrucoes de citacao e contexto;
+- menor exigencia de hardware local;
+- configuracao simples por variaveis de ambiente;
+- disponibilidade de embeddings via Gemini para RAG vetorial;
+- menor risco de travamento em uma maquina com pouca RAM;
+- comparacao entre dois provedores reais sem mudar a arquitetura do app.
+
+Limitacoes dos provedores pagos/externos:
+
+- exigem internet;
+- podem gerar custo por uso;
+- podem sofrer rate limit ou limite gratuito;
+- dependem da disponibilidade do provedor;
+- PDFs e trechos recuperados sao enviados para uma API externa;
+- mudancas futuras de modelo, preco ou endpoint podem exigir ajustes;
+- tool calling nativo nao foi usado, entao as ferramentas sao controladas pela aplicacao.
+
+Seria viavel rodar com modelo local?
+
+- Tecnicamente sim, desde que a maquina tenha RAM, CPU/GPU e armazenamento suficientes;
+- no ambiente atual, Ollama/modelo local ficou fora do escopo por limitacao tecnica e por nao ser necessario para o objetivo do projeto;
+- a arquitetura permitiria adicionar um adaptador local em `llm_service.py` no futuro, mantendo o mesmo contrato `generate_response(prompt, settings)`.
+
+O que se ganharia com modelo local:
+
+- maior privacidade, pois os trechos dos PDFs nao sairiam da maquina;
+- funcionamento offline depois de baixar o modelo;
+- custo variavel menor por chamada;
+- mais controle sobre o ambiente de execucao.
+
+O que se perderia com modelo local nesta aplicacao:
+
+- qualidade potencialmente menor em respostas academicas, dependendo do modelo;
+- maior latencia em maquina sem GPU;
+- menor janela de contexto em modelos pequenos;
+- maior consumo de RAM e disco;
+- configuracao mais complexa para o usuario;
+- embeddings e tool calling poderiam exigir componentes adicionais;
+- manutencao local de modelos, quantizacao e servidor.
+
+Trade-off final:
+
+- Gemini e OpenAI foram escolhidos para priorizar qualidade, simplicidade de uso e menor dependencia de hardware;
+- o custo e a privacidade sao mitigados com `Placeholder`, modo `Lexical` sem API e limite de ate 3 PDFs;
+- modelo local seria uma boa evolucao para privacidade/offline, mas nao para o escopo final deste projeto.
+
+### System prompt
+
+O system prompt base fica em `components/sidebar.py` como `DEFAULT_SYSTEM_PROMPT`.
+
+Ele foi projetado para controlar comportamento, escopo e rastreabilidade da resposta.
+
+Estrutura logica do prompt:
+
+```text
+Papel
+  -> Euclides, assistente de estudo academico
+Restricao principal
+  -> usar apenas PDFs carregados pelo usuario
+Comportamento esperado
+  -> explicar com clareza
+  -> citar documento quando possivel
+  -> avisar quando algo nao estiver nas fontes
+Configuracoes dinamicas
+  -> modo de ensino
+  -> fontes carregadas
+  -> estilo de citacao
+  -> estrategia de resposta
+```
+
+Elementos definidos:
+
+- identidade do assistente: Euclides, assistente de estudo academico;
+- regra principal: usar apenas PDFs carregados pelo usuario;
+- obrigacao de clareza;
+- orientacao para citar documentos quando possivel;
+- aviso quando a informacao nao estiver nas fontes;
+- formato esperado de resposta no prompt de tarefa:
+  - resposta direta;
+  - evidencias com citacoes;
+  - indicacao clara quando a informacao nao aparece nos PDFs;
+- placeholders configuraveis:
+  - `[[TEACHING_MODE]]`;
+  - `[[SOURCES]]`;
+  - `[[CITATION_STYLE]]`;
+  - `[[ANSWER_STRATEGY]]`.
+
+Decisao:
+
+- manter o prompt visivel e editavel na sidebar;
+- mostrar o preview final do prompt para auditoria;
+- separar prompt base, contexto recuperado e instrucao da tarefa.
+
+Motivo:
+
+- facilita demonstrar como o comportamento da LLM e controlado;
+- permite testar modos de ensino sem alterar codigo;
+- reduz risco de respostas fora do contexto.
+
+Iteracao e refinamento:
+
+1. Prompt inicial: persona academica e regra de usar PDFs.
+2. Problema identificado: respostas poderiam ficar genericas ou nao indicar limites do contexto.
+3. Refinamento: adicao de regra para avisar quando a informacao nao estiver nas fontes.
+4. Refinamento: inclusao de placeholders para modo de ensino, fontes, citacao e estrategia.
+5. Refinamento: `context_builder.py` passou a montar um prompt de tarefa com pergunta, contexto recuperado e formato esperado.
+6. Refinamento: `tool_service.py` passou a criar prompts especificos para resumo, mapa mental, tabela, citas, flashcards e quiz.
+
+Exemplo de prompt final montado pelo app:
+
+```text
+Voce e o Euclides, um assistente de estudo academico.
+Use apenas as fontes em PDF carregadas pelo usuario.
+Explique com clareza, cite o documento quando possivel e avise quando algo nao estiver nas fontes.
+Modo de ensino: Explicacao direta
+Fontes carregadas: artigo.pdf
+Estilo de citacao: Arquivo + pagina
+Estrategia de resposta: Responder somente com as fontes
+
+Instrucao da tarefa:
+Responda usando apenas o contexto recuperado abaixo. Comece com uma resposta direta.
+Em seguida, apresente evidencias com citacoes. Use citacoes no formato (arquivo, p. numero).
+Se o contexto nao trouxer a resposta, escreva claramente:
+'Nao encontrei essa informacao nos PDFs carregados.'
+
+Pergunta do usuario:
+Quais foram os participantes do estudo?
+
+Contexto recuperado:
+[Fonte 1] artigo.pdf, p. 3
+Score: 0.84
+Termos encontrados: participants, study
+Trecho: The study enrolled 120 undergraduate students...
+
+Resposta:
+```
+
+### Parametros do modelo
+
+Parametros configuraveis na sidebar:
+
+- provedor;
+- modelo;
+- temperatura;
+- max tokens;
+- quantidade de trechos recuperados por pergunta.
+
+Valores iniciais:
+
+- provedor: `Placeholder`;
+- temperatura: `0.2`;
+- max tokens: `1200`;
+- trechos recuperados: `5`;
+- modo de busca: `Lexical`.
+
+Decisao:
+
+- temperatura baixa para priorizar respostas mais estaveis e menos criativas;
+- max tokens controlavel para reduzir custo e evitar respostas longas demais;
+- modelo editavel para permitir testes sem mudar codigo;
+- `Lexical` como busca padrao para funcionar sem custo de embeddings.
+
+Tabela de decisao:
+
+| Parametro | Valor final/padrao | Valores considerados | Justificativa |
+| --- | --- | --- | --- |
+| Provedor | `Placeholder` | `Placeholder`, `Gemini`, `OpenAI` | evita custo acidental e permite testar interface/RAG sem API |
+| Modelo Gemini | `gemini-3.1-flash-lite` | modelos Gemini mais leves e modelos maiores | prioriza latencia, custo e integracao REST simples |
+| Modelo OpenAI | `gpt-5` | modelo padrao OpenAI configuravel pelo usuario | oferece segundo provedor de maior capacidade sem mudar arquitetura |
+| Temperatura | `0.2` | `0.0`, `0.2`, `0.7` | `0.0` ficou rigido demais; `0.7` aumenta variacao; `0.2` equilibra estabilidade e linguagem natural |
+| Max tokens | `1200` | `800`, `1200`, `2000` | `800` pode cortar respostas; `2000` aumenta custo; `1200` basta para respostas academicas curtas |
+| `retrieval_k` | `5` | `3`, `5`, `8` | `3` pode perder contexto; `8` aumenta prompt/custo; `5` equilibra cobertura e concisao |
+| Modo de busca | `Lexical` | `Lexical`, `Vetorial`, `Hibrida` | `Lexical` funciona sem API; `Vetorial` e `Hibrida` ficam disponiveis quando ha chave Gemini |
+| Embeddings | `gemini-embedding-001` | embeddings por API vs. semantica local | evita exigir modelo local e melhora consultas multilingues |
+| `top-p` | padrao do provedor | expor na UI vs. manter implicito | nao foi exposto para reduzir complexidade e evitar ajuste redundante com temperatura |
+
+Evidencia de experimentacao e refinamento:
+
+- `Placeholder` foi mantido como padrao apos testes de fluxo para evitar chamadas pagas durante desenvolvimento;
+- `Lexical` foi mantido como padrao porque funcionou bem para termos exatos, nomes, siglas e validacao sem chave de API;
+- `Hibrida` foi adicionada depois da busca lexical para combinar significado semantico com termos exatos;
+- `retrieval_k=5` foi escolhido como equilibrio entre contexto suficiente e prompt curto;
+- temperatura baixa foi adotada porque o caso de uso exige respostas rastreaveis, nao criatividade;
+- max tokens foi mantido em `1200` para limitar custo e ainda permitir resposta com evidencias;
+- OpenAI e Gemini usam a mesma interface `LlmSettings`, permitindo comparar provedores sem alterar componentes.
+
+Parametros deliberadamente nao expostos:
+
+- `top-p` nao foi exposto na interface para manter a configuracao simples;
+- penalidades de frequencia/presenca nao foram expostas porque o app nao gera texto criativo longo;
+- seed nao foi exposta porque a prioridade e rastreabilidade por fonte, nao reproducibilidade exata de cada token;
+- caso seja necessario, esses campos podem ser adicionados ao mesmo objeto `LlmSettings`.
+
+### Estrategia de prompting
+
+O projeto usa prompting instrucional com RAG e prompts especificos por tarefa.
+
+Padrao usado:
+
+```text
+system prompt configuravel
+  -> instrucao da tarefa
+  -> pergunta/topico do usuario
+  -> contexto recuperado dos PDFs
+  -> regras de citacao
+  -> formato esperado da resposta
+```
+
+Decisoes:
+
+- nao usar few-shot prompting nesta versao;
+- nao solicitar chain-of-thought;
+- nao usar XML tags formais;
+- usar delimitadores textuais simples como `Instrucao da tarefa`, `Pergunta do usuario`, `Contexto recuperado` e `Resposta`;
+- exigir resposta direta seguida de evidencias;
+- exigir citacoes no formato `(arquivo, p. numero)`;
+- instruir a LLM a dizer quando a informacao nao foi encontrada nos PDFs.
+
+Motivo:
+
+- o objetivo e estudo academico com rastreabilidade;
+- a resposta deve ser verificavel nas fontes;
+- chain-of-thought nao e necessario para o usuario final e poderia expor raciocinio intermediario desnecessario;
+- few-shot aumentaria o prompt e o custo sem necessidade clara neste escopo.
+
+Tecnicas usadas:
+
+- RAG com contexto explicitamente delimitado;
+- instrucao negativa contra invencao de autores, numeros, resultados e conclusoes;
+- formato de resposta definido por tarefa;
+- prompts especializados para ferramentas;
+- citacao obrigatoria por fonte e pagina;
+- fallback textual quando a informacao nao aparece no contexto;
+- temperatura baixa para reduzir variacao.
+
+Few-shot:
+
+- nao foi usado porque as tarefas dependem fortemente do conteudo recuperado dos PDFs;
+- exemplos fixos poderiam enviesar respostas para formatos ou dominios que nao aparecem no documento do usuario;
+- a decisao foi priorizar instrucao clara + contexto recuperado.
+
+Chain-of-thought:
+
+- nao foi solicitado;
+- o app pede resposta direta e evidencias, nao raciocinio interno passo a passo;
+- isso reduz verbosidade e evita expor raciocinio intermediario desnecessario.
+
+XML tags:
+
+- nao foram usadas tags XML formais;
+- o projeto usa secoes textuais claras porque sao suficientes para Gemini e OpenAI neste fluxo;
+- se o projeto exigisse parsing automatico rigido, XML ou JSON estruturado seriam considerados.
+
+Formato de saida por tipo de tarefa:
+
+- Chat: resposta direta, evidencias citadas e limites do contexto;
+- Resumo: ideia central, pontos principais, evidencias e limites;
+- Mapa mental: conceito central, ramos, evidencias e fontes;
+- Tabela: campos extraidos com documento, pagina e observacao;
+- Citas: citacao, documento, pagina e relevancia;
+- Flashcards: frente e verso com fonte;
+- Quiz: pergunta, resposta correta e justificativa citada.
+
+### RAG
+
+O projeto usa RAG para responder com base nos PDFs carregados.
+
+Etapas:
+
+1. Upload de ate 3 PDFs.
+2. Extracao de texto com `pypdf`.
+3. Divisao em chunks.
+4. Recuperacao de trechos.
+5. Montagem de contexto.
+6. Chamada ao provedor selecionado.
+7. Resposta com citacoes.
+
+Modos de recuperacao:
+
+- `Lexical`: busca local por termos, sem API;
+- `Vetorial`: embeddings Gemini e similaridade por cosseno;
+- `Hibrida`: combina busca lexical e semantica.
+
+Decisoes:
+
+- manter busca lexical como padrao e fallback;
+- usar embeddings Gemini somente quando o usuario escolhe `Vetorial` ou `Hibrida`;
+- usar indice vetorial em memoria/cache do Streamlit;
+- nao usar FAISS, Chroma ou pgvector neste fechamento.
+
+Motivo:
+
+- o app precisa funcionar sem custo e sem chave de embeddings;
+- busca lexical e forte para nomes, siglas, termos tecnicos e palavras exatas;
+- busca vetorial melhora perguntas em portugues sobre textos em ingles;
+- indice em memoria e suficiente para ate 3 PDFs e reduz complexidade operacional.
+
+### Ferramentas disponibilizadas
+
+Ferramentas da aplicacao:
+
+| Ferramenta | Entrada principal | Saida | Usa RAG | Usa LLM real | Justificativa |
+| --- | --- | --- | --- | --- | --- |
+| Chat | pergunta do usuario | resposta direta com evidencias | sim | opcional | permitir perguntas livres sobre os PDFs |
+| Resumo | topico | resumo academico curto | sim | opcional | condensar conteudo para estudo |
+| Mapa mental | tema | estrutura hierarquica | sim | opcional | organizar conceitos e relacoes |
+| Tabela de dados | campos/dados desejados | linhas tabulares | sim | opcional | transformar trechos em dados comparaveis |
+| Citas | tema | citacoes relevantes com fonte | sim | opcional | apoiar escrita academica e revisao |
+| Flashcards | tema | frente e verso | sim | opcional | apoiar memorizacao ativa |
+| Quiz | tema | perguntas e gabarito | sim | opcional | apoiar autoavaliacao |
+| Exportacao TXT | conteudo gerado | arquivo `.txt` | nao | nao | salvar materiais de estudo fora do app |
+
+Decisao importante:
+
+- essas ferramentas sao ferramentas da aplicacao, nao tools/function calling nativas da LLM.
+
+Motivo:
+
+- o controle do fluxo fica no codigo Python;
+- a LLM recebe prompts especificos e contexto recuperado;
+- evita depender de formatos proprietarios de function calling;
+- facilita manter o mesmo comportamento em Gemini, OpenAI e Placeholder.
+
+Contrato geral das ferramentas:
+
+```text
+entrada do usuario
+  -> validacao de PDFs e texto extraivel
+  -> recuperacao de trechos com retrieve_chunks_with_status
+  -> montagem de prompt especifico
+  -> Placeholder ou provedor real
+  -> exibicao na interface
+  -> exportacao TXT quando aplicavel
+```
+
+Parametros usados pelas ferramentas:
+
+| Parametro | Tipo | Origem | Uso |
+| --- | --- | --- | --- |
+| `topic` / pergunta | `str` | campo de texto ou chat | direciona recuperacao e prompt |
+| `retrieval_mode` | `str` | sidebar | escolhe `Lexical`, `Vetorial` ou `Hibrida` |
+| `retrieval_k` | `int` | sidebar | controla quantos trechos entram no contexto |
+| `model_provider` | `str` | sidebar | escolhe `Placeholder`, `Gemini` ou `OpenAI` |
+| `model_name` | `str` | sidebar | define modelo do provedor |
+| `temperature` | `float` | sidebar | controla variacao da resposta |
+| `max_tokens` | `int` | sidebar | limita tamanho da resposta |
+| `system_prompt` | `str` | sidebar/context_builder | define comportamento geral |
+| `RetrievedChunk[]` | lista tipada | RAG | contem chunk, score e termos encontrados |
+
+Contratos de saida:
+
+| Ferramenta | Formato esperado |
+| --- | --- |
+| Chat | texto com resposta direta, evidencias e citacoes |
+| Resumo | Markdown/texto com ideia central, pontos principais e limites |
+| Mapa mental | Markdown/texto hierarquico |
+| Tabela de dados | dataframe no modo Placeholder ou Markdown/texto no modo LLM |
+| Citas | lista de citacoes com arquivo e pagina |
+| Flashcards | dataframe no modo Placeholder ou Markdown/texto no modo LLM |
+| Quiz | Markdown/texto com perguntas, respostas e justificativas |
+| Exportacao TXT | texto simples com data, topico, conteudo e fontes |
+
+Quando um provedor real esta ativo:
+
+- a ferramenta monta um prompt especifico;
+- envia o prompt para `generate_response`;
+- recebe texto final do modelo.
+
+Quando `Placeholder` esta ativo:
+
+- a ferramenta gera saida simulada baseada nos trechos recuperados;
+- isso permite testar RAG, interface e exportacao sem custo de API.
+
+Tratamento de erros e estados vazios:
+
+- se nao houver PDF carregado, a ferramenta pede para carregar pelo menos um PDF;
+- se o PDF nao tiver texto extraivel, a ferramenta mostra aviso e recomenda verificar o diagnostico;
+- se nenhum trecho relevante for encontrado, a ferramenta nao chama LLM e avisa o usuario;
+- se `GEMINI_API_KEY` estiver ausente em modo vetorial/hibrido, a recuperacao volta para lexical;
+- se `GEMINI_API_KEY` ou `OPENAI_API_KEY` estiver ausente no provedor real, `llm_service.py` retorna erro amigavel;
+- timeouts, modelo inexistente, permissao invalida e rate limit tambem recebem mensagens amigaveis;
+- exportacao TXT funciona sem API, pois usa o conteudo ja gerado.
+
+Descricao das ferramentas para a LLM:
+
+- `build_summary_prompt`: pede resumo academico curto com ideia central, pontos principais, evidencias e limites do contexto;
+- `build_mind_map_prompt`: pede estrutura hierarquica com conceito central, ramos, evidencias e limites;
+- `build_table_prompt`: pede tabela Markdown com documento, pagina, campo, valor extraido, citacao e observacao;
+- `build_citations_prompt`: pede citacoes uteis, documento, pagina, motivo de relevancia e limite de uso;
+- `build_flashcards_prompt`: pede flashcards com frente e verso, baseados no contexto e com citacao;
+- `build_quiz_prompt`: pede quiz curto com resposta correta e justificativa citada.
+
+Por que nao usar tools/function calling nativas:
+
+- as ferramentas nao precisam que a LLM decida quando chamar funcoes;
+- o usuario escolhe explicitamente a ferramenta na interface;
+- o fluxo fica deterministico e mais facil de avaliar;
+- Gemini e OpenAI podem receber o mesmo prompt, mantendo portabilidade;
+- parametros e erros ficam controlados no codigo Python.
+
+### Structured outputs, agentes e multi-agente
+
+Structured outputs:
+
+- nao foram usados como recurso nativo dos provedores;
+- tabelas e flashcards usam estruturas Python internas quando em modo `Placeholder`;
+- quando a LLM real e usada, a saida e texto/Markdown orientado por prompt.
+
+Agentes:
+
+- nao foram implementados;
+- nao ha planejamento autonomo, chamadas iterativas de ferramentas pela LLM ou memoria agentica.
+
+Multi-agente:
+
+- nao foi implementado;
+- o projeto usa um fluxo unico e deterministico.
+
+Motivo:
+
+- o requisito principal e uma aplicacao funcional com IA generativa e decisoes de LLM documentadas;
+- RAG simples e ferramentas controladas atendem melhor ao escopo;
+- agentes aumentariam custo, latencia e complexidade sem necessidade para estudar PDFs.
+
+### Tratamento de erros e seguranca
+
+Decisoes:
+
+- chaves de API nao ficam no codigo;
+- `GEMINI_API_KEY` e `OPENAI_API_KEY` sao lidas de variaveis de ambiente;
+- erros de chave ausente, permissao, modelo inexistente, timeout e limite de uso retornam mensagens amigaveis;
+- PDFs sem texto extraivel geram aviso;
+- respostas devem usar apenas os trechos recuperados.
+
+Limitacoes aceitas:
+
+- PDFs escaneados sem OCR nao sao lidos;
+- o indice vetorial nao e persistente;
+- nao ha avaliacao automatica de qualidade das respostas;
+- nao ha banco de conversas;
+- a citacao depende da qualidade do texto extraido e dos chunks recuperados.
+
 ## Fases de desenvolvimento
 
 ## Fase 1 - PDF funcional
@@ -864,6 +1365,86 @@ Dependencias futuras so devem entrar se houver necessidade real de recursos avan
 - O modo padrao ainda e lexical, mas ja existe busca vetorial e busca hibrida selecionavel na sidebar.
 - A expansao portugues-ingles cobre apenas termos comuns; nao e uma traducao completa da pergunta.
 - O chunking atual ainda e baseado em tamanho de texto; futuramente pode ser refinado por secoes, titulos e estrutura do artigo.
+
+## O que funcionou
+
+Decisoes que deram bons resultados no escopo do projeto:
+
+1. **Placeholder como modo padrao**
+   - Permitiu testar interface, RAG, prompts, ferramentas e exportacao sem custo de API.
+   - Reduziu risco de chamadas acidentais para Gemini ou OpenAI.
+
+2. **RAG antes da chamada ao modelo**
+   - Melhorou a rastreabilidade das respostas.
+   - Permitiu exigir citacoes por arquivo e pagina.
+   - Reduziu dependencia de conhecimento geral solto do modelo.
+
+3. **Busca lexical como padrao e fallback**
+   - Funcionou bem para nomes, siglas, termos tecnicos e palavras exatas.
+   - Manteve o app funcional mesmo sem `GEMINI_API_KEY`.
+
+4. **Busca hibrida**
+   - Melhorou a recuperacao quando o usuario pergunta em portugues sobre artigos em ingles.
+   - Combinou a precisao de termos exatos com similaridade semantica.
+
+5. **Prompts especificos por ferramenta**
+   - Resumo, mapa mental, tabela, citas, flashcards e quiz passaram a ter instrucoes proprias.
+   - Isso deixou as saidas mais alinhadas ao objetivo de cada ferramenta.
+
+6. **Regra de citacao e limite de contexto**
+   - A instrucao para citar `(arquivo, p. numero)` ajudou a tornar as respostas verificaveis.
+   - A regra de dizer quando a informacao nao aparece nos PDFs reduziu extrapolacoes.
+
+7. **Chamadas REST diretas**
+   - Mantiveram o projeto simples e com poucas dependencias.
+   - Facilitaram auditar onde cada provedor e chamado.
+
+8. **Exportacao TXT**
+   - Entregou utilidade pratica para estudo.
+   - Evitou dependencias extras e formatos complexos.
+
+## O que nao funcionou e ajustes feitos
+
+Problemas encontrados, limitacoes e ajustes:
+
+1. **PDFs escaneados sem OCR**
+   - Problema: `pypdf` nao extrai texto de PDFs compostos por imagem.
+   - Ajuste: foi criado diagnostico de fontes para avisar quando nao ha texto extraivel.
+   - Decisao: OCR ficou fora do escopo final.
+
+2. **Modelo local/Ollama**
+   - Problema: a maquina tinha limitacoes tecnicas para rodar modelo local com qualidade aceitavel.
+   - Ajuste: Ollama foi removido do escopo final.
+   - Decisao: usar Gemini e OpenAI por API.
+
+3. **Busca lexical isolada**
+   - Problema: busca por palavras pode falhar quando pergunta e artigo usam termos diferentes ou idiomas diferentes.
+   - Ajuste: foi adicionada expansao portugues-ingles para termos academicos.
+   - Ajuste posterior: foi adicionada busca vetorial e modo hibrido.
+
+4. **Busca vetorial com custo e dependencia de chave**
+   - Problema: embeddings dependem de `GEMINI_API_KEY` e podem gerar custo.
+   - Ajuste: `Lexical` continua como padrao.
+   - Ajuste: modos `Vetorial` e `Hibrida` fazem fallback para lexical quando embeddings falham.
+
+5. **Risco de respostas genericas da LLM**
+   - Problema: modelos podem responder com conhecimento geral sem usar os PDFs.
+   - Ajuste: prompts passaram a exigir uso apenas do contexto recuperado.
+   - Ajuste: prompts passaram a pedir citacoes e aviso quando a resposta nao estiver nos PDFs.
+
+6. **Function calling nativo**
+   - Problema: usar tools nativas de cada provedor aumentaria acoplamento e complexidade.
+   - Ajuste: as ferramentas foram implementadas como ferramentas da aplicacao.
+   - Decisao: a LLM recebe prompts especificos, mas nao decide autonomamente qual ferramenta chamar.
+
+7. **Banco vetorial persistente**
+   - Problema: FAISS, Chroma ou pgvector adicionariam dependencia e configuracao.
+   - Ajuste: foi usado indice em memoria/cache do Streamlit.
+   - Decisao: suficiente para ate 3 PDFs no escopo atual.
+
+8. **Prompt inicial pouco restritivo**
+   - Problema: um prompt apenas com persona academica nao documentava formato de resposta nem limites.
+   - Ajuste: o prompt foi refinado com restricao de fonte, citacao, modo de ensino, estrategia de resposta e aviso de ausencia de contexto.
 
 ## Status final
 
