@@ -3,6 +3,7 @@ from __future__ import annotations
 import streamlit as st
 
 from components.sidebar import current_llm_settings, final_system_prompt
+from services.export_service import build_chat_export, txt_filename
 from services.llm_service import answer_with_context
 from services.pdf_loader import load_pdf_corpus
 from services.vector_retrieval import retrieve_chunks_with_status
@@ -18,6 +19,15 @@ def render_chat() -> None:
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.write(message["content"])
+
+    if st.session_state.messages:
+        st.download_button(
+            "Exportar chat TXT",
+            data=build_chat_export(st.session_state.messages),
+            file_name=txt_filename("chat"),
+            mime="text/plain",
+            use_container_width=True,
+        )
 
     prompt = st.chat_input("Pergunte algo sobre os documentos...")
     if not prompt:

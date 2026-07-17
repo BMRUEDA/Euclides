@@ -26,15 +26,16 @@ Fases implementadas ate agora:
 - Fase 5: modelo real minimo via Gemini.
 - Fase 6: RAG vetorial inicial com embeddings Gemini, indice em memoria e busca hibrida.
 - Fase 7: ferramentas academicas extras e controle real de `Active tools`.
+- Fase 8C: OpenAI como segundo provedor real via API.
 
 O modo padrao continua `Placeholder` e `Lexical`, para evitar custo de API por acidente. Para usar Gemini real ou embeddings, e necessario configurar `GEMINI_API_KEY`.
 
 Escopo final definido:
 
 - Gemini continua como provedor real ja implementado.
-- OpenAI sera implementado como segundo provedor real via API.
+- OpenAI esta implementado como segundo provedor real via API.
 - Ollama e modelos locais nao serao implementados por questoes tecnicas e porque o projeto nao precisa rodar modelo local.
-- O projeto sera considerado concluido depois da Fase 8A, exportacao de materiais de estudo, e da Fase 8C, suporte OpenAI.
+- O projeto sera considerado concluido depois da Fase 8A, exportacao de materiais de estudo em TXT.
 
 ## Objetivo da v2
 
@@ -76,7 +77,7 @@ Euclides
   Resposta final
 ```
 
-O app ja possui modo simulado (`Placeholder`) e chamada real inicial ao Gemini. O foco final e adicionar OpenAI como segundo provedor de API e exportar materiais de estudo para tornar o projeto pratico e concluido.
+O app ja possui modo simulado (`Placeholder`) e chamadas reais ao Gemini e a OpenAI. O foco final e exportar materiais de estudo em TXT para tornar o projeto pratico e concluido.
 
 ## Estrutura de pastas
 
@@ -97,6 +98,7 @@ euclides_v2/
     chunking.py
     context_builder.py
     embedding_service.py
+    export_service.py
     llm_service.py
     pdf_loader.py
     retrieval.py
@@ -118,6 +120,7 @@ Ele:
 - renderiza diagnostico das fontes;
 - renderiza painel de teste de busca;
 - renderiza ferramentas de estudo;
+- permite exportar chat e ferramentas em TXT;
 - respeita a selecao de `Active tools` para exibir ou ocultar o chat.
 
 ### `components/sidebar.py`
@@ -130,7 +133,7 @@ Inclui:
 - limite de 3 fontes;
 - lista de arquivos carregados;
 - remocao de arquivos;
-- configuracao futura de modelos;
+- configuracao de modelos;
 - preview do prompt final.
 
 Paineis disponiveis:
@@ -181,10 +184,10 @@ Atualmente:
 - recebe perguntas do usuario;
 - valida se ha PDF carregado;
 - valida se ha texto extraivel;
-- usa a busca simples para recuperar trechos;
-- envia os trechos para uma resposta simulada em `llm_service.py`.
-
-Na proxima fase, este componente deve passar a montar um prompt com contexto real e enviar para um provedor de modelo.
+- usa a recuperacao configurada na sidebar para recuperar trechos;
+- envia os trechos para `llm_service.py`;
+- responde com `Placeholder`, Gemini ou OpenAI;
+- permite exportar a conversa em TXT.
 
 ### `components/study_tools.py`
 
@@ -201,7 +204,7 @@ Inclui:
 
 As ferramentas usam a mesma busca ranqueada do chat e podem retornar saidas simuladas ou respostas reais via provedor de modelo selecionado.
 
-Cada ferramenta tambem mostra o prompt preparado para uma LLM futura.
+Cada ferramenta tambem mostra o prompt enviado ou preparado para a LLM e permite exportar o resultado em TXT.
 
 ### `models/source.py`
 
@@ -243,9 +246,9 @@ Ele:
 
 ### `services/retrieval.py`
 
-Servico de busca inicial.
+Servico de busca lexical.
 
-Ainda nao usa embeddings. A busca atual e lexical, baseada em palavras.
+Implementa a recuperacao local baseada em palavras, usada diretamente no modo `Lexical` e como fallback/complemento dos modos `Vetorial` e `Hibrida`.
 
 Ela faz:
 
@@ -266,7 +269,7 @@ amostra -> sample
 participantes -> participants
 ```
 
-Essa expansao acontece antes da etapa de LLM. Ela serve apenas para recuperar trechos melhores. A LLM futura recebera os trechos encontrados como contexto; ela nao precisa saber que a busca expandiu os termos.
+Essa expansao acontece antes da etapa de LLM. Ela serve apenas para recuperar trechos melhores. A LLM recebe os trechos encontrados como contexto; ela nao precisa saber que a busca expandiu os termos.
 
 Na versao com RAG vetorial, a busca semantica deve ser a estrategia principal. A busca lexical com expansao pode continuar como complemento ou fallback para nomes, siglas, termos tecnicos e palavras exatas.
 
@@ -274,7 +277,7 @@ Na versao com RAG vetorial, a busca semantica deve ser a estrategia principal. A
 
 Servico central para respostas com modelo.
 
-Atualmente mantem o modo `Placeholder` simulado e ja chama Gemini via API quando esse provedor esta selecionado. OpenAI sera adicionado como segundo provedor real. Ollama nao faz parte do escopo final.
+Atualmente mantem o modo `Placeholder` simulado e ja chama Gemini ou OpenAI via API quando um desses provedores esta selecionado. Ollama nao faz parte do escopo final.
 
 Esse isolamento e intencional: provedores reais devem ser conectados principalmente neste arquivo, sem espalhar chamadas de API pelos componentes.
 
@@ -301,6 +304,18 @@ Contem funcoes para:
 - montar prompts especificos para cada ferramenta.
 
 As ferramentas ja usam os resultados ranqueados da busca, incluindo fonte, pagina, score e termos encontrados. Na fase de LLM, essas funcoes devem trocar a simulacao por chamadas reais ao provedor selecionado.
+
+### `services/export_service.py`
+
+Servico de exportacao TXT.
+
+Ele:
+
+- monta TXT para conversa do chat;
+- monta TXT para resultados das ferramentas;
+- inclui data, topico, conteudo e fontes usadas;
+- gera nomes de arquivo seguros;
+- nao adiciona dependencias externas.
 
 ## Fases de desenvolvimento
 
@@ -352,13 +367,13 @@ O que foi feito:
 8. Ordenacao dos resultados por relevancia.
 9. Criado painel `Teste de busca`.
 10. O painel mostra score, termos encontrados, arquivo, pagina e preview.
-11. Chat e ferramentas passaram a usar `retrieval_k` da configuracao futura.
+11. Chat e ferramentas passaram a usar `retrieval_k` da configuracao.
 
 Decisao tecnica:
 
 - A expansao portugues-ingles foi mantida porque melhora o uso do app antes da busca semantica.
 - Ela nao substitui embeddings.
-- Ela nao deve atrapalhar uma LLM futura, pois atua somente na etapa de recuperacao.
+- Ela nao atrapalha a LLM, pois atua somente na etapa de recuperacao.
 - Quando houver RAG vetorial, a recuperacao semantica deve ser a principal.
 - A busca lexical pode continuar como fallback para casos em que palavras exatas importam.
 
@@ -409,7 +424,7 @@ O que foi feito:
 4. O resumo simulado passou a exibir evidencias recuperadas e fontes usadas.
 5. O mapa mental simulado passou a organizar ramos a partir dos termos e trechos recuperados.
 6. A tabela passou a incluir documento, pagina, campo, score, termos e trecho.
-7. Cada ferramenta passou a exibir o prompt preparado para uma LLM futura.
+7. Cada ferramenta passou a exibir o prompt preparado para a LLM.
 
 Detalhamento tecnico:
 
@@ -431,7 +446,7 @@ topico informado pelo usuario
   -> retrieve_ranked_chunks()
   -> tool_service.py
   -> saida simulada estruturada
-  -> prompt preparado para LLM futura
+  -> prompt preparado para LLM
 ```
 
 Resumo:
@@ -454,13 +469,13 @@ Tabela de dados:
 
 - recebe os trechos ranqueados;
 - monta linhas com documento, pagina, campo, score, termos e trecho;
-- prepara um prompt para a LLM extrair campos estruturados futuramente.
+- prepara um prompt para a LLM extrair campos estruturados.
 
 Decisao tecnica:
 
 - As ferramentas continuam simuladas para manter controle da arquitetura antes da LLM.
 - A camada de recuperacao ja esta integrada.
-- A troca futura sera concentrada em `tool_service.py` e no servico de modelo.
+- A chamada real fica concentrada em `tool_service.py` e no servico de modelo.
 - O usuario ja consegue validar se as ferramentas usam trechos reais dos PDFs.
 
 Como testar:
@@ -470,7 +485,7 @@ Como testar:
 3. Informar um topico presente no artigo.
 4. Verificar se a saida usa trechos reais dos PDFs.
 5. Verificar se aparecem fontes, paginas, scores ou termos encontrados.
-6. Abrir `Prompt preparado para a LLM` para conferir o contexto enviado futuramente ao modelo.
+6. Abrir `Prompt preparado para a LLM` para conferir o contexto enviado ao modelo.
 
 ## Fase 5 - Modelo real
 
@@ -478,10 +493,10 @@ Status: minimo funcional implementado com Gemini.
 
 Objetivo: conectar um provedor de LLM.
 
-Provedores planejados para o fechamento do projeto:
+Provedores implementados para o fechamento do projeto:
 
 - Gemini como provedor real inicial via API;
-- OpenAI como segundo provedor real via API, ainda nao implementado;
+- OpenAI como segundo provedor real via API;
 - Placeholder como modo local simulado, sem custo e sem chamada externa.
 
 Ollama e modelos locais ficam fora do escopo final por questoes tecnicas da maquina e porque o projeto nao precisa executar LLM localmente.
@@ -493,7 +508,7 @@ Preparacao ja feita:
 - o chat ja monta o prompt final com o contexto recuperado;
 - as ferramentas ja montam prompts especificos com o mesmo contexto recuperado;
 - o `Final system prompt preview` da sidebar ja e aplicado ao chat e aos prompts das ferramentas;
-- `llm_service.py` concentra a resposta simulada, as configuracoes de modelo e a chamada real ao Gemini;
+- `llm_service.py` concentra a resposta simulada, as configuracoes de modelo e as chamadas reais ao Gemini e a OpenAI;
 - `tool_service.py` concentra os prompts das ferramentas e reutiliza o mesmo servico de modelo.
 
 Adaptador Gemini inicial:
@@ -505,6 +520,15 @@ Adaptador Gemini inicial:
 - usa `temperature` e `max tokens` da sidebar;
 - mostra erro amigavel quando a chave esta ausente, o modelo nao existe, a conexao falha ou o limite gratuito e atingido;
 - mantem `Placeholder` como modo simulado para testar a aplicacao sem API.
+
+Adaptador OpenAI:
+
+- modelo padrao: `gpt-5`;
+- chave esperada: `OPENAI_API_KEY`;
+- chamada feita via REST para a Responses API;
+- usa `temperature` e `max tokens` da sidebar;
+- mostra erro amigavel quando a chave esta ausente, o modelo nao existe, a conexao falha ou o limite de uso e atingido;
+- reutiliza o mesmo prompt com contexto recuperado usado por Gemini e Placeholder.
 
 Refinamento de respostas:
 
@@ -541,7 +565,7 @@ Como sera feita:
 1. Criar uma interface comum em `llm_service.py`, por exemplo `generate_response(prompt, settings)`. Implementado.
 2. Criar adaptadores internos para cada provedor:
    - `call_gemini`: implementado;
-   - `call_openai`: planejado para a Fase 8C;
+   - `call_openai`: implementado;
    - `Placeholder`: implementado como modo simulado.
 3. Ler da sidebar:
    - provedor;
@@ -561,12 +585,12 @@ Estrategia recomendada:
 
 - Usar Gemini como provedor inicial.
 - Manter `Placeholder` como modo sem custo para testes de interface e recuperacao.
-- Adicionar OpenAI para completar o suporte a provedores por API.
+- Usar OpenAI como segundo provedor por API.
 - Nao implementar Ollama nem outro modelo local neste projeto.
 - Nao colocar chaves de API no codigo.
 - Manter a resposta sempre baseada nos trechos recuperados, nao em conhecimento solto do modelo.
 
-Exemplo de variaveis futuras:
+Variaveis de ambiente usadas:
 
 ```text
 OPENAI_API_KEY
@@ -721,6 +745,59 @@ Como testar:
 6. Testar em modo `Placeholder` e depois com `Gemini`.
 7. Testar `Vetorial` ou `Hibrida` para confirmar que as ferramentas usam a mesma recuperacao do chat.
 
+## Fase 8C - OpenAI
+
+Status: implementada.
+
+Objetivo: adicionar OpenAI como segundo provedor real por API, mantendo a mesma arquitetura usada pelo Gemini.
+
+O que foi feito:
+
+1. Adicionado `DEFAULT_OPENAI_MODEL`.
+2. Adicionado `call_openai` em `llm_service.py`.
+3. A chamada usa REST para a Responses API.
+4. A chave esperada e `OPENAI_API_KEY`.
+5. `generate_response` passou a rotear `OpenAI`.
+6. A sidebar passou a mostrar apenas `Placeholder`, `Gemini` e `OpenAI`.
+7. Ollama foi removido da selecao visual e permanece fora do escopo final.
+8. Erros de chave ausente, modelo invalido, conexao, timeout e limite de uso recebem mensagens amigaveis.
+
+Como testar:
+
+1. Definir `OPENAI_API_KEY` no PowerShell.
+2. Rodar o app.
+3. Selecionar `OpenAI` na sidebar.
+4. Carregar um PDF com texto extraivel.
+5. Perguntar no chat ou gerar uma ferramenta.
+6. Verificar se a resposta usa fontes e paginas dos PDFs.
+
+## Fase 8A - Exportacao TXT
+
+Status: implementada.
+
+Objetivo: permitir que o usuario salve os materiais de estudo gerados pelo Euclides em arquivos `.txt`, sem dependencias novas.
+
+O que foi feito:
+
+1. Criado `export_service.py`.
+2. Adicionado exportador TXT do chat.
+3. Adicionado exportador TXT para `Resumo`.
+4. Adicionado exportador TXT para `Mapa mental`.
+5. Adicionado exportador TXT para `Tabela de dados`.
+6. Adicionado exportador TXT para `Citas`.
+7. Adicionado exportador TXT para `Flashcards`.
+8. Adicionado exportador TXT para `Quiz`.
+9. Os arquivos exportados incluem data, topico, conteudo e fontes usadas.
+10. Tabelas e flashcards sao convertidos para texto simples.
+
+Como testar:
+
+1. Carregar um PDF.
+2. Fazer uma pergunta no chat e clicar em `Exportar chat TXT`.
+3. Gerar cada ferramenta de estudo.
+4. Clicar no botao `Exportar ... TXT`.
+5. Abrir o arquivo baixado e conferir conteudo, topico e fontes.
+
 ## Como executar
 
 Dentro da raiz do repositorio:
@@ -746,24 +823,23 @@ streamlit>=1.36.0
 pypdf>=5.0.0
 ```
 
-Nenhuma dependencia nova foi adicionada para o Gemini inicial. A chamada usa bibliotecas padrao do Python via REST.
+Nenhuma dependencia nova foi adicionada para Gemini ou OpenAI. As chamadas usam bibliotecas padrao do Python via REST.
 
-Variavel de ambiente necessaria para usar Gemini:
+Variaveis de ambiente para usar provedores reais:
 
 ```text
 GEMINI_API_KEY
+OPENAI_API_KEY
 ```
 
 Em PowerShell:
 
 ```powershell
 $env:GEMINI_API_KEY="SUA_CHAVE_AQUI"
+$env:OPENAI_API_KEY="SUA_CHAVE_AQUI"
 ```
 
-Dependencias futuras podem entrar junto com o adaptador OpenAI, por exemplo:
-
-- OpenAI: SDK oficial `openai` ou cliente HTTP;
-- Gemini avancado: SDK do Google, se for necessario usar recursos alem da chamada REST atual.
+Dependencias futuras so devem entrar se houver necessidade real de recursos avancados. O fechamento atual evita SDKs externos.
 
 ## Fluxo atual da aplicacao
 
@@ -774,12 +850,13 @@ Dependencias futuras podem entrar junto com o adaptador OpenAI, por exemplo:
 5. O teste de busca chama `retrieve_chunks_with_status`.
 6. Chat usa `retrieve_chunks_with_status`, respeitando o modo `Lexical`, `Vetorial` ou `Hibrida`.
 7. Ferramentas usam a mesma recuperacao configurada na sidebar para montar resumo, mapa mental, tabela, citas, flashcards, quiz e prompts.
-8. A resposta final usa Gemini quando o provedor esta selecionado e `GEMINI_API_KEY` existe; caso contrario, o modo `Placeholder` continua simulado.
-9. OpenAI sera adicionado como segundo provedor por API antes do encerramento do projeto.
+8. A resposta final usa Gemini quando o provedor esta selecionado e `GEMINI_API_KEY` existe.
+9. A resposta final usa OpenAI quando o provedor esta selecionado e `OPENAI_API_KEY` existe.
+10. O modo `Placeholder` continua simulado e sem custo.
 
 ## Limitacoes atuais
 
-- A LLM real inicial e Gemini; OpenAI ainda sera conectado.
+- As LLMs reais por API sao Gemini e OpenAI.
 - Ollama e modelos locais nao fazem parte do escopo final.
 - Embeddings existem via Gemini, mas dependem de `GEMINI_API_KEY`.
 - O indice vetorial ainda e um prototipo em memoria/cache do Streamlit, nao um banco vetorial persistente como FAISS, Chroma ou pgvector.
@@ -788,47 +865,26 @@ Dependencias futuras podem entrar junto com o adaptador OpenAI, por exemplo:
 - A expansao portugues-ingles cobre apenas termos comuns; nao e uma traducao completa da pergunta.
 - O chunking atual ainda e baseado em tamanho de texto; futuramente pode ser refinado por secoes, titulos e estrutura do artigo.
 
-## Proximos passos finais
+## Status final
 
-Antes de iniciar as fases finais, testar o app com PDFs reais e confirmar que as Fases 6 e 7 estao estaveis.
+O projeto esta concluido dentro do escopo definido.
 
-Prioridade 1 - Validacao:
+Checklist de validacao:
 
-1. Testar chat com `Placeholder` e com `Gemini`.
+1. Testar chat com `Placeholder`, `Gemini` e `OpenAI`.
 2. Testar busca `Lexical`, `Vetorial` e `Hibrida`.
 3. Confirmar fallback para lexical quando `GEMINI_API_KEY` estiver ausente ou embeddings falharem.
 4. Testar ferramentas `Resumo`, `Mapa mental`, `Tabela de dados`, `Citas`, `Flashcards` e `Quiz`.
 5. Conferir se as respostas citam arquivo e pagina.
-
-Prioridade 2 - Diagnostico da recuperacao:
-
-1. Mostrar com mais clareza o modo solicitado e o modo efetivo.
-2. Mostrar quantidade de chunks analisados e recuperados.
-3. Mostrar quando embeddings foram usados.
-4. Mostrar aviso de custo potencial em modos `Vetorial` e `Hibrida`.
-
-Prioridade 3 - Fase 8C, suporte OpenAI:
-
-1. Implementar `call_openai` em `llm_service.py`.
-2. Usar `OPENAI_API_KEY` como variavel de ambiente.
-3. Manter a mesma interface `generate_response(prompt, settings)`.
-4. Fazer chat e ferramentas funcionarem com `Placeholder`, `Gemini` e `OpenAI`.
-5. Exibir erros amigaveis para chave ausente, modelo invalido, timeout e limite de uso.
-
-Prioridade 4 - Fase 8A, exportacao de materiais:
-
-1. Exportar respostas do chat para Markdown ou TXT.
-2. Exportar resumo, mapa mental, tabela, citas, flashcards e quiz.
-3. Manter citacoes de fonte e pagina no arquivo exportado.
-4. Evitar dependencias novas inicialmente.
+6. Exportar chat e ferramentas em TXT.
 
 Encerramento do projeto:
 
-O projeto sera considerado concluido quando:
+O projeto e considerado concluido porque:
 
 1. Gemini e OpenAI estiverem disponiveis como provedores por API.
 2. O modo `Placeholder` continuar funcionando para testes sem custo.
-3. As ferramentas de estudo puderem exportar materiais em Markdown ou TXT.
+3. As ferramentas de estudo puderem exportar materiais em TXT.
 4. O README documentar como configurar `GEMINI_API_KEY` e `OPENAI_API_KEY`.
 
 Fora do escopo final:

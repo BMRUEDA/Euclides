@@ -4,7 +4,7 @@ import streamlit as st
 
 from models.source import SourceFile
 from services.embedding_service import has_embedding_api_key
-from services.llm_service import DEFAULT_GEMINI_MODEL, LlmSettings
+from services.llm_service import DEFAULT_GEMINI_MODEL, DEFAULT_OPENAI_MODEL, LlmSettings
 
 
 MAX_SOURCES = 3
@@ -98,16 +98,23 @@ def render_sidebar() -> None:
 def render_configuration_sidebar() -> None:
     with st.sidebar:
         st.divider()
-        st.header("Configuracao futura")
+        st.header("Configuracao")
         st.caption("Configuracao para modelo real, RAG e ferramentas.")
 
         with st.expander("Model settings", expanded=False):
-            st.selectbox(
+            selected_provider = st.selectbox(
                 "Provedor",
-                ["Placeholder", "Ollama", "OpenAI", "Gemini"],
+                ["Placeholder", "Gemini", "OpenAI"],
                 key="model_provider",
             )
-            st.text_input("Modelo", key="model_name", placeholder=DEFAULT_GEMINI_MODEL)
+            default_model = DEFAULT_OPENAI_MODEL if selected_provider == "OpenAI" else DEFAULT_GEMINI_MODEL
+            st.text_input("Modelo", key="model_name", placeholder=default_model)
+            if selected_provider == "Gemini":
+                st.caption("Chave esperada: GEMINI_API_KEY.")
+            elif selected_provider == "OpenAI":
+                st.caption("Chave esperada: OPENAI_API_KEY.")
+            else:
+                st.caption("Modo simulado sem chamada de API.")
             st.slider("Temperatura", 0.0, 1.5, key="temperature", step=0.1)
             st.number_input(
                 "Max tokens",

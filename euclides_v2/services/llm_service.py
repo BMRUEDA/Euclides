@@ -12,7 +12,9 @@ from services.context_builder import build_context_prompt, build_sources_summary
 
 
 DEFAULT_GEMINI_MODEL = "gemini-3.1-flash-lite"
+DEFAULT_OPENAI_MODEL = "gpt-5"
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+OPENAI_API_URL = "https://api.openai.com/v1/responses"
 REQUEST_TIMEOUT_SECONDS = 60
 
 
@@ -49,10 +51,13 @@ def generate_response(prompt: str, settings: LlmSettings) -> str:
     if provider == "Gemini":
         return call_gemini(prompt, settings)
 
+    if provider == "OpenAI":
+        return call_openai(prompt, settings)
+
     if provider == "Placeholder":
         return (
             "O provedor Placeholder nao executa uma LLM real. "
-            "Selecione Gemini e configure GEMINI_API_KEY para usar a Fase 5."
+            "Selecione Gemini ou OpenAI e configure a chave de API correspondente."
         )
 
     return f"O provedor {provider} ainda nao foi implementado nesta fase."
@@ -102,10 +107,56 @@ def call_gemini(prompt: str, settings: LlmSettings) -> str:
     return extract_gemini_text(data)
 
 
+def call_openai(prompt: str, settings: LlmSettings) -> str:
+    api_key = os.getenv("OPENAI_API_KEY", "").strip()
+    if not api_key:
+        return (
+            "OpenAI ainda nao esta configurado.\n\n"
+            "Defina a variavel de ambiente OPENAI_API_KEY e reinicie o Streamlit."
+        )
+
+    payload = {
+        "model": normalized_openai_model_name(settings),
+        "input": prompt,
+        "temperature": settings.temperature,
+        "max_output_tokens": settings.max_tokens,
+    }
+    request = Request(
+        OPENAI_API_URL,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+        },
+        method="POST",
+    )
+
+    try:
+        with urlopen(request, timeout=REQUEST_TIMEOUT_SECONDS) as response:
+            data = json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        return format_openai_http_error(exc)
+    except URLError as exc:
+        return f"Nao foi possivel conectar a OpenAI: {exc.reason}"
+    except TimeoutError:
+        return "A chamada a OpenAI excedeu o tempo limite. Tente reduzir os trechos ou max tokens."
+    except Exception as exc:
+        return f"Erro inesperado ao chamar a OpenAI: {exc}"
+
+    return extract_openai_text(data)
+
+
 def normalized_model_name(settings: LlmSettings) -> str:
     model_name = settings.model_name.strip()
     if not model_name or model_name == "Modelo ainda nao conectado":
         return DEFAULT_GEMINI_MODEL
+    return model_name
+
+
+def normalized_openai_model_name(settings: LlmSettings) -> str:
+    model_name = settings.model_name.strip()
+    if not model_name or model_name in {"Modelo ainda nao conectado", DEFAULT_GEMINI_MODEL}:
+        return DEFAULT_OPENAI_MODEL
     return model_name
 
 
@@ -130,6 +181,32 @@ def extract_gemini_text(data: dict) -> str:
     return "O Gemini retornou uma resposta sem texto legivel."
 
 
+def extract_openai_text(data: dict) -> str:
+    output_text = data.get("output_text")
+    if isinstance(output_text, str) and output_text.strip():
+        return output_text.strip()
+
+    text_parts: list[str] = []
+    for item in data.get("output", []):
+        for content in item.get("content", []):
+            text = content.get("text")
+            if text:
+                text_parts.append(text)
+
+    if text_parts:
+        return "\n".join(text_parts).strip()
+
+    error = data.get("error") or {}
+    if error.get("message"):
+        return f"A OpenAI retornou erro: {error['message']}"
+
+    status = data.get("status")
+    if status:
+        return f"A OpenAI terminou sem texto. Status: {status}."
+
+    return "A OpenAI retornou uma resposta sem texto legivel."
+
+
 def format_gemini_http_error(exc: HTTPError) -> str:
     try:
         body = json.loads(exc.read().decode("utf-8"))
@@ -147,6 +224,25 @@ def format_gemini_http_error(exc: HTTPError) -> str:
         return f"Limite gratuito ou rate limit do Gemini atingido. {message or 'Tente novamente depois.'}"
 
     return f"Erro HTTP do Gemini ({exc.code}). {message or exc.reason}"
+
+
+def format_openai_http_error(exc: HTTPError) -> str:
+    try:
+        body = json.loads(exc.read().decode("utf-8"))
+        message = body.get("error", {}).get("message")
+    except Exception:
+        message = None
+
+    if exc.code == 400:
+        return f"OpenAI rejeitou a requisicao. {message or 'Verifique o modelo e o prompt.'}"
+    if exc.code == 401 or exc.code == 403:
+        return f"Chave da OpenAI invalida ou sem permissao. {message or ''}".strip()
+    if exc.code == 404:
+        return f"Modelo OpenAI nao encontrado. {message or 'Verifique o nome do modelo.'}"
+    if exc.code == 429:
+        return f"Limite de uso ou rate limit da OpenAI atingido. {message or 'Tente novamente depois.'}"
+
+    return f"Erro HTTP da OpenAI ({exc.code}). {message or exc.reason}"
 
 
 def build_simulated_answer(
@@ -172,6 +268,6 @@ def build_simulated_answer(
         "```text\n"
         f"{context_prompt}\n"
         "```\n\n"
-        "Observacao: esta resposta ainda e simulada. A estrutura de contexto ja esta pronta "
-        "para substituir esta funcao por uma chamada real a Ollama, OpenAI ou Gemini."
+        "Observacao: esta resposta usa o modo Placeholder. Selecione OpenAI ou Gemini "
+        "para gerar uma resposta real com o mesmo contexto recuperado."
     )

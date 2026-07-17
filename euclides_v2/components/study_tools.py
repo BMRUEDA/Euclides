@@ -4,6 +4,7 @@ import streamlit as st
 
 from models.source import RetrievedChunk
 from components.sidebar import current_llm_settings, final_system_prompt
+from services.export_service import build_tool_export, txt_filename
 from services.llm_service import generate_response
 from services.pdf_loader import load_pdf_corpus
 from services.tool_service import (
@@ -104,9 +105,11 @@ def render_summary_tool(tab) -> None:
             if results:
                 prompt = build_summary_prompt(topic, results, final_system_prompt())
                 if should_use_real_model():
-                    st.markdown(generate_response(prompt, current_llm_settings()))
+                    content = generate_response(prompt, current_llm_settings())
                 else:
-                    st.markdown(build_summary(topic, results))
+                    content = build_summary(topic, results)
+                st.markdown(content)
+                render_txt_download("Resumo", topic, content, results)
                 with st.expander("Prompt preparado para a LLM", expanded=False):
                     st.code(prompt, language="text")
 
@@ -119,9 +122,11 @@ def render_mind_map_tool(tab) -> None:
             if results:
                 prompt = build_mind_map_prompt(topic, results, final_system_prompt())
                 if should_use_real_model():
-                    st.markdown(generate_response(prompt, current_llm_settings()))
+                    content = generate_response(prompt, current_llm_settings())
                 else:
-                    st.markdown(build_mind_map(topic, results))
+                    content = build_mind_map(topic, results)
+                st.markdown(content)
+                render_txt_download("Mapa mental", topic, content, results)
                 with st.expander("Prompt preparado para a LLM", expanded=False):
                     st.code(prompt, language="text")
 
@@ -134,10 +139,12 @@ def render_table_tool(tab) -> None:
             if results:
                 prompt = build_table_prompt(topic, results, final_system_prompt())
                 if should_use_real_model():
-                    st.markdown(generate_response(prompt, current_llm_settings()))
+                    content = generate_response(prompt, current_llm_settings())
+                    st.markdown(content)
                 else:
-                    rows = build_data_table(topic, results)
-                    st.dataframe(rows, use_container_width=True, hide_index=True)
+                    content = build_data_table(topic, results)
+                    st.dataframe(content, use_container_width=True, hide_index=True)
+                render_txt_download("Tabela de dados", topic, content, results)
                 with st.expander("Prompt preparado para a LLM", expanded=False):
                     st.code(prompt, language="text")
 
@@ -150,9 +157,11 @@ def render_citations_tool(tab) -> None:
             if results:
                 prompt = build_citations_prompt(topic, results, final_system_prompt())
                 if should_use_real_model():
-                    st.markdown(generate_response(prompt, current_llm_settings()))
+                    content = generate_response(prompt, current_llm_settings())
                 else:
-                    st.markdown(build_citations(topic, results))
+                    content = build_citations(topic, results)
+                st.markdown(content)
+                render_txt_download("Citas", topic, content, results)
                 with st.expander("Prompt preparado para a LLM", expanded=False):
                     st.code(prompt, language="text")
 
@@ -165,10 +174,12 @@ def render_flashcards_tool(tab) -> None:
             if results:
                 prompt = build_flashcards_prompt(topic, results, final_system_prompt())
                 if should_use_real_model():
-                    st.markdown(generate_response(prompt, current_llm_settings()))
+                    content = generate_response(prompt, current_llm_settings())
+                    st.markdown(content)
                 else:
-                    rows = build_flashcards(topic, results)
-                    st.dataframe(rows, use_container_width=True, hide_index=True)
+                    content = build_flashcards(topic, results)
+                    st.dataframe(content, use_container_width=True, hide_index=True)
+                render_txt_download("Flashcards", topic, content, results)
                 with st.expander("Prompt preparado para a LLM", expanded=False):
                     st.code(prompt, language="text")
 
@@ -181,8 +192,25 @@ def render_quiz_tool(tab) -> None:
             if results:
                 prompt = build_quiz_prompt(topic, results, final_system_prompt())
                 if should_use_real_model():
-                    st.markdown(generate_response(prompt, current_llm_settings()))
+                    content = generate_response(prompt, current_llm_settings())
                 else:
-                    st.markdown(build_quiz(topic, results))
+                    content = build_quiz(topic, results)
+                st.markdown(content)
+                render_txt_download("Quiz", topic, content, results)
                 with st.expander("Prompt preparado para a LLM", expanded=False):
                     st.code(prompt, language="text")
+
+
+def render_txt_download(
+    tool_name: str,
+    topic: str,
+    content,
+    results: list[RetrievedChunk],
+) -> None:
+    st.download_button(
+        f"Exportar {tool_name} TXT",
+        data=build_tool_export(tool_name, topic, content, results),
+        file_name=txt_filename(tool_name, topic),
+        mime="text/plain",
+        use_container_width=True,
+    )
